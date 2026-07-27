@@ -265,6 +265,42 @@ h3 {
   height: 19px;
 }
 
+.download-button {
+  display: inline-flex;
+}
+
+.download-button-copy {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  line-height: 1.05;
+}
+
+.download-button-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.download-button-platform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0;
+  opacity: 0.62;
+}
+
+.download-button-platform .apple-glyph {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
 .button-primary {
   border-color: rgba(255, 255, 255, 0.35);
   background: linear-gradient(180deg, var(--pink-light), var(--pink));
@@ -289,34 +325,6 @@ h3 {
 .button-secondary:hover {
   border-color: rgba(255, 255, 255, 0.34);
   background: rgba(255, 255, 255, 0.11);
-}
-
-.compatibility {
-  display: flex;
-  margin-top: 18px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #827d85;
-  font-size: 14px;
-  font-weight: 540;
-}
-
-.compatibility-icon {
-  display: inline-grid;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  place-items: center;
-  overflow: visible;
-}
-
-.apple-glyph {
-  display: block;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 17px;
-  font-weight: 500;
-  line-height: 18px;
 }
 
 .hero-visual {
@@ -483,10 +491,6 @@ h3 {
   min-height: 56px;
   margin-top: 30px;
   padding-inline: 26px;
-}
-
-.download-copy .compatibility {
-  justify-content: center;
 }
 
 .site-footer {
@@ -664,11 +668,6 @@ h3 {
 
   .download-copy {
     width: 100%;
-  }
-
-  .compatibility {
-    margin-top: 16px;
-    font-size: 13px;
   }
 
   .hero-visual {

@@ -114,9 +114,22 @@ export default function Home() {
 
             <Reveal delay={0.14}>
               <div className="hero-actions" aria-label="SakuraCord downloads and source">
-                <a className="button button-primary" href={DOWNLOAD_URL}>
-                  <DownloadSimpleIcon aria-hidden="true" weight="bold" />
-                  Download Alpha
+                <a
+                  className="button button-primary download-button"
+                  href={DOWNLOAD_URL}
+                >
+                  <span className="download-button-copy">
+                    <span className="download-button-title">
+                      <DownloadSimpleIcon aria-hidden="true" weight="bold" />
+                      <span>Download Alpha</span>
+                    </span>
+                    <span className="download-button-platform">
+                      <span className="apple-glyph" aria-hidden="true">
+                        
+                      </span>
+                      MacOS 27+
+                    </span>
+                  </span>
                 </a>
                 <a
                   className="button button-secondary"
@@ -127,12 +140,6 @@ export default function Home() {
                   View on GitHub
                 </a>
               </div>
-              <p className="compatibility">
-                <span className="compatibility-icon" aria-hidden="true">
-                  <span className="apple-glyph"></span>
-                </span>
-                MacOS 27+
-              </p>
             </Reveal>
           </div>
 
@@ -237,16 +244,23 @@ export default function Home() {
             <Reveal className="download-copy" delay={0.06}>
               <h2 id="download-title">Download SakuraCord.</h2>
 
-              <a className="button button-primary button-large" href={DOWNLOAD_URL}>
-                <DownloadSimpleIcon aria-hidden="true" weight="bold" />
-                Download Alpha
-              </a>
-              <p className="compatibility">
-                <span className="compatibility-icon" aria-hidden="true">
-                  <span className="apple-glyph"></span>
+              <a
+                className="button button-primary button-large download-button"
+                href={DOWNLOAD_URL}
+              >
+                <span className="download-button-copy">
+                  <span className="download-button-title">
+                    <DownloadSimpleIcon aria-hidden="true" weight="bold" />
+                    <span>Download Alpha</span>
+                  </span>
+                  <span className="download-button-platform">
+                    <span className="apple-glyph" aria-hidden="true">
+                      
+                    </span>
+                    MacOS 27+
+                  </span>
                 </span>
-                MacOS 27+
-              </p>
+              </a>
             </Reveal>
           </div>
 

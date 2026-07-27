@@ -37,6 +37,8 @@ test("server-renders the SakuraCord landing page", async () => {
   assert.match(html, /<h1[^>]*>SakuraCord<\/h1>/);
   assert.match(html, /Download Alpha/);
   assert.match(html, /MacOS 27\+/);
+  assert.match(html, /download-button-platform/);
+  assert.doesNotMatch(html, /class="compatibility"/);
   assert.match(html, /full voice and video support/);
   assert.match(html, new RegExp(DOWNLOAD_URL.replaceAll(".", "\\.")));
   assert.match(html, new RegExp(DISCORD_URL.replaceAll(".", "\\.")));
