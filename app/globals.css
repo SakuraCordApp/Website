@@ -651,13 +651,19 @@ h3 {
   }
 
   .hero-actions {
+    width: 100%;
     margin-top: 28px;
     flex-direction: column;
     gap: 10px;
   }
 
-  .button {
-    min-width: 200px;
+  .hero-actions .button,
+  .download-copy .button {
+    width: 100%;
+  }
+
+  .download-copy {
+    width: 100%;
   }
 
   .compatibility {

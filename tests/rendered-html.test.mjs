@@ -36,7 +36,7 @@ test("server-renders the SakuraCord landing page", async () => {
   assert.match(html, /<title>SakuraCord - Native Discord for macOS<\/title>/);
   assert.match(html, /<h1[^>]*>SakuraCord<\/h1>/);
   assert.match(html, /Download Alpha/);
-  assert.match(html, /Requires macOS 27 or newer/);
+  assert.match(html, /MacOS 27\+/);
   assert.match(html, /full voice and video support/);
   assert.match(html, new RegExp(DOWNLOAD_URL.replaceAll(".", "\\.")));
   assert.match(html, new RegExp(DISCORD_URL.replaceAll(".", "\\.")));
@@ -58,6 +58,12 @@ test("keeps the landing page accessible and resilient", async () => {
   assert.match(page, /Discord, built as a Mac app\./);
   assert.match(page, /Join the community\./);
   assert.match(page, /There is no Chromium bundle behind the interface/);
+  assert.match(page, /className="discord-mark"/);
+  assert.doesNotMatch(page, /DiscordLogoIcon/);
+  assert.match(
+    css,
+    /\.hero-actions \.button,\s*\.download-copy \.button\s*\{\s*width: 100%;/,
+  );
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce/);
