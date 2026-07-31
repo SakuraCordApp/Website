@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const DOWNLOAD_URL =
+  "https://github.com/SakuraCordApp/SakuraCord/releases/latest";
+const STALE_DOWNLOAD_URL =
   "https://github.com/SakuraCordApp/SakuraCord/releases/latest/download/SakuraCord.dmg";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
 
@@ -41,6 +43,10 @@ test("server-renders the SakuraCord landing page", async () => {
   assert.doesNotMatch(html, /class="compatibility"/);
   assert.match(html, /full voice and video support/);
   assert.match(html, new RegExp(DOWNLOAD_URL.replaceAll(".", "\\.")));
+  assert.doesNotMatch(
+    html,
+    new RegExp(STALE_DOWNLOAD_URL.replaceAll(".", "\\.")),
+  );
   assert.match(html, new RegExp(DISCORD_URL.replaceAll(".", "\\.")));
   assert.match(html, /property="og:image" content="https:\/\/sakuracord\.app\/og\.png"/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
