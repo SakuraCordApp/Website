@@ -8,8 +8,7 @@ import { MemoryIcon } from "@phosphor-icons/react/dist/ssr/Memory";
 import { VideoCameraIcon } from "@phosphor-icons/react/dist/ssr/VideoCamera";
 import { Reveal } from "./reveal";
 
-const DOWNLOAD_URL =
-  "https://github.com/SakuraCordApp/SakuraCord/releases/latest";
+const DOWNLOAD_URL = "/download";
 const GITHUB_URL = "https://github.com/SakuraCordApp/SakuraCord";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
 const ROADMAP_URL = "https://roadmap.sakuracord.app";

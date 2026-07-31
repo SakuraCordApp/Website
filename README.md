@@ -26,7 +26,7 @@ page, metadata, release link, community link, and accessibility fallbacks.
 
 ## Important links
 
-- Latest DMG: `https://github.com/SakuraCordApp/SakuraCord/releases/latest`
+- Latest DMG: `https://sakuracord.app/download`
 - Source: `https://github.com/SakuraCordApp/SakuraCord`
 - Discord: `https://discord.gg/hWNwFXkUTP`
 - Engineering roadmap: `https://roadmap.sakuracord.app`
