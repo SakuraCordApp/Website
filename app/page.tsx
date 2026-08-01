@@ -146,7 +146,7 @@ export default function Home() {
             <div className="product-stage">
               <img
                 className="product-image"
-                src="/media/sakuracord-app.webp"
+                src="/media/sakuracord-client-preview.webp"
                 alt="SakuraCord open to the community general channel on macOS"
                 width={2880}
                 height={1584}
