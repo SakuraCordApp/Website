@@ -45,7 +45,11 @@ body {
   overflow-x: hidden;
   background: var(--ink);
   color: var(--text);
-  font-family: "LA Text", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    "LA Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   font-size: 16px;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
@@ -83,7 +87,11 @@ p {
 h1,
 h2,
 h3 {
-  font-family: "LA Display", "LA Text", -apple-system, BlinkMacSystemFont,
+  font-family:
+    "LA Display",
+    "LA Text",
+    -apple-system,
+    BlinkMacSystemFont,
     sans-serif;
   text-wrap: balance;
 }
@@ -122,6 +130,7 @@ h3 {
 }
 
 .header-inner {
+  position: relative;
   display: flex;
   width: min(1120px, calc(100% - 48px));
   height: 100%;
@@ -146,19 +155,25 @@ h3 {
   border-radius: 8px;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 25px;
+  gap: 23px;
   color: #bbb6bd;
   font-size: 13px;
   font-weight: 560;
+}
+
+.nav-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nav-links a > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
 }
 
 .nav-links a,
@@ -197,6 +212,35 @@ h3 {
 .header-download svg {
   width: 15px;
   height: 15px;
+}
+
+.menu-button {
+  display: none;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  place-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--macos-control-radius);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+}
+
+.menu-button:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.menu-button:focus-visible {
+  border-radius: var(--macos-control-radius);
+  outline: 3px solid var(--pink);
+  outline-offset: 3px;
+}
+
+.menu-button svg {
+  width: 17px;
+  height: 17px;
 }
 
 .hero {
@@ -340,8 +384,7 @@ h3 {
 .product-image {
   width: 100%;
   height: auto;
-  filter:
-    drop-shadow(0 36px 54px rgba(0, 0, 0, 0.38))
+  filter: drop-shadow(0 36px 54px rgba(0, 0, 0, 0.38))
     drop-shadow(0 0 42px rgba(239, 155, 196, 0.08));
 }
 
@@ -350,7 +393,11 @@ h3 {
   z-index: 2;
   border-block: 1px solid var(--border);
   background:
-    radial-gradient(circle at 50% 0%, rgba(239, 155, 196, 0.055), transparent 34%),
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(239, 155, 196, 0.055),
+      transparent 34%
+    ),
     #100f14;
   color: var(--text);
   scroll-margin-top: 0;
@@ -463,7 +510,11 @@ h3 {
 
 .download-section {
   background:
-    radial-gradient(circle at 50% 30%, rgba(239, 155, 196, 0.1), transparent 32%),
+    radial-gradient(
+      circle at 50% 30%,
+      rgba(239, 155, 196, 0.1),
+      transparent 32%
+    ),
     var(--ink);
 }
 
@@ -561,8 +612,53 @@ h3 {
     width: calc(100% - 36px);
   }
 
+  .menu-button {
+    display: grid;
+  }
+
   .nav-links {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
     display: none;
+    width: min(250px, calc(100vw - 36px));
+    padding: 7px;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--macos-control-radius);
+    color: #c8c3ca;
+    background: #17151b;
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.46),
+      inset 0 1px rgba(255, 255, 255, 0.035);
+  }
+
+  .nav-links.is-open {
+    display: grid;
+  }
+
+  .nav-links a,
+  .nav-links .header-download {
+    min-height: 44px;
+    padding-inline: 12px;
+    gap: 10px;
+    border: 0;
+    border-radius: 8px;
+    color: #c8c3ca;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 560;
+  }
+
+  .nav-links a > svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-links a:hover,
+  .nav-links .header-download:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.07);
   }
 
   .benefit-list {
@@ -625,17 +721,6 @@ h3 {
     width: 30px;
     height: 30px;
     border-radius: 8px;
-  }
-
-  .header-download {
-    width: 34px;
-    min-height: 34px;
-    padding: 0;
-    justify-content: center;
-  }
-
-  .header-download span {
-    display: none;
   }
 
   .hero {
