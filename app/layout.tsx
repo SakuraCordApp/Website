@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       "A fast native Discord client for macOS with full voice and video support.",
     images: [
       {
-        url: "/og.png",
+        url: "/og-v2.png",
         width: 1200,
         height: 630,
         alt: "SakuraCord branding above a real screenshot of the macOS client",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     title: "SakuraCord - Discord, at home on the Mac.",
     description:
       "A fast native Discord client for macOS with full voice and video support.",
-    images: ["/og.png"],
+    images: ["/og-v2.png"],
   },
 };
 

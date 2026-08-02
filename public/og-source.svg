@@ -2,7 +2,7 @@
 <!--
   Hand-authored SakuraCord social preview.
   The product window is the real client screenshot from /public/media.
-  Render at 1200x630 to update og.png.
+  Render at 1200x630 to update og-v2.png.
 -->
 <svg
   xmlns="http://www.w3.org/2000/svg"

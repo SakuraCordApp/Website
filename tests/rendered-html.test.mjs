@@ -54,7 +54,10 @@ test("server-renders the SakuraCord landing page", async () => {
       `<a[^>]+class="brand-link"[^>]+href="${MAIN_SITE_URL.replaceAll(".", "\\.")}"`,
     ),
   );
-  assert.match(html, /property="og:image" content="https:\/\/sakuracord\.app\/og\.png"/);
+  assert.match(
+    html,
+    /property="og:image" content="https:\/\/sakuracord\.app\/og-v2\.png"/,
+  );
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });
 
