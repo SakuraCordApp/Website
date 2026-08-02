@@ -25,7 +25,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "SakuraCord, Discord at home on the Mac",
+        alt: "SakuraCord branding above a real screenshot of the macOS client",
       },
     ],
   },
