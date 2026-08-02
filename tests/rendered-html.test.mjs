@@ -6,6 +6,7 @@ const DOWNLOAD_URL = "/download";
 const STALE_DOWNLOAD_URL =
   "https://github.com/SakuraCordApp/SakuraCord/releases/latest/download/SakuraCord.dmg";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
+const MAIN_SITE_URL = "https://sakuracord.app";
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -47,6 +48,12 @@ test("server-renders the SakuraCord landing page", async () => {
     new RegExp(STALE_DOWNLOAD_URL.replaceAll(".", "\\.")),
   );
   assert.match(html, new RegExp(DISCORD_URL.replaceAll(".", "\\.")));
+  assert.match(
+    html,
+    new RegExp(
+      `<a[^>]+class="brand-link"[^>]+href="${MAIN_SITE_URL.replaceAll(".", "\\.")}"`,
+    ),
+  );
   assert.match(html, /property="og:image" content="https:\/\/sakuracord\.app\/og\.png"/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });

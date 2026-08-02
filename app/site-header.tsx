@@ -16,6 +16,8 @@ type SiteHeaderProps = {
   roadmapUrl: string;
 };
 
+const MAIN_SITE_URL = "https://sakuracord.app";
+
 export function SiteHeader({
   discordUrl,
   downloadUrl,
@@ -57,7 +59,11 @@ export function SiteHeader({
   return (
     <header className="site-header" aria-label="Primary navigation">
       <div className="header-inner">
-        <a className="brand-link" href="#top" aria-label="SakuraCord home">
+        <a
+          className="brand-link"
+          href={MAIN_SITE_URL}
+          aria-label="SakuraCord home"
+        >
           <img
             src="/brand/favicon.png"
             alt=""
