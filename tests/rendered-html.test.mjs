@@ -121,6 +121,7 @@ test("keeps the landing page accessible and resilient", async () => {
     css,
     /\.hero-actions \.button,\s*\.download-copy \.button\s*\{\s*width: 100%;/,
   );
+  assert.match(css, /::selection\s*\{[^}]*background: var\(--pink-light\)/s);
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce/);

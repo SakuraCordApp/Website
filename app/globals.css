@@ -61,6 +61,11 @@ a {
   text-decoration: none;
 }
 
+::selection {
+  color: var(--ink);
+  background: var(--pink-light);
+}
+
 a:focus-visible {
   border-radius: 8px;
   outline: 3px solid var(--pink);
