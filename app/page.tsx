@@ -90,7 +90,7 @@ export default function Home() {
                       <span className="apple-glyph" aria-hidden="true">
                         
                       </span>
-                      MacOS 27+
+                      macOS 27+
                     </span>
                   </span>
                 </a>
@@ -220,7 +220,7 @@ export default function Home() {
                     <span className="apple-glyph" aria-hidden="true">
                       
                     </span>
-                    MacOS 27+
+                    macOS 27+
                   </span>
                 </span>
               </a>

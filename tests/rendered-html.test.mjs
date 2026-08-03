@@ -38,7 +38,7 @@ test("server-renders the SakuraCord landing page", async () => {
   assert.match(html, /<title>SakuraCord - Native Discord for macOS<\/title>/);
   assert.match(html, /<h1[^>]*>SakuraCord<\/h1>/);
   assert.match(html, /Download Alpha/);
-  assert.match(html, /MacOS 27\+/);
+  assert.match(html, /macOS 27\+/);
   assert.match(html, /download-button-platform/);
   assert.doesNotMatch(html, /class="compatibility"/);
   assert.match(html, /full voice and video support/);
