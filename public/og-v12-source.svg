@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SakuraCord Discord/social preview.
+  Uses Mythic's GPL-3.0 photographic hardware render and original notch mask.
+  The complete 16:10 desktop is width-fitted at the top of the taller display
+  slot; the remaining 42 physical pixels are black padding at the bottom.
+  See /public/media/macbook-shell for attribution.
+  Render with: npm run render:discord-preview
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">SakuraCord — Native SwiftUI, Voice and Video, and Blazing Fast</title>
+  <desc id="description">
+    SakuraCord running on a realistic notched MacBook with a complete 16:10 desktop.
+  </desc>
+
+  <defs>
+    <style>
+      @font-face {
+        font-family: "LADisplay";
+        src: url("fonts/LADisplay-VF.ttf") format("truetype");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "LAText";
+        src: url("fonts/LAText-VF.ttf") format("truetype");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+    </style>
+
+    <radialGradient id="bottom-glow" cx="50%" cy="88%" r="76%">
+      <stop offset="0" stop-color="#f09ac4" stop-opacity="0.48" />
+      <stop offset="0.46" stop-color="#cf6097" stop-opacity="0.19" />
+      <stop offset="1" stop-color="#b84c84" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="device-shadow" x="-10%" y="-8%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="15" stdDeviation="17" flood-color="#000000" flood-opacity="0.66" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#060609" />
+  <rect x="0" y="280" width="1200" height="350" fill="url(#bottom-glow)" />
+
+  <text
+    x="600"
+    y="119.06"
+    fill="#ef95be"
+    font-family="LADisplay, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif"
+    font-size="90"
+    font-weight="735"
+    letter-spacing="-2.1"
+    text-anchor="middle"
+  >SakuraCord</text>
+
+  <text
+    x="600"
+    y="165.06"
+    fill="#e5e3e7"
+    font-family="LAText, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif"
+    font-size="24"
+    font-weight="510"
+    letter-spacing="-0.15"
+    text-anchor="middle"
+  >Native SwiftUI, Voice and Video, and Blazing Fast</text>
+
+  <image
+    x="70"
+    y="218"
+    width="1060"
+    height="647.97"
+    preserveAspectRatio="none"
+    filter="url(#device-shadow)"
+    href="media/sakuracord-macbook-device-real.png"
+    xlink:href="media/sakuracord-macbook-device-real.png"
+  />
+</svg>

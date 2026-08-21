@@ -56,7 +56,7 @@ test("server-renders the SakuraCord landing page", async () => {
   );
   assert.match(
     html,
-    /property="og:image" content="https:\/\/sakuracord\.app\/og-v2\.png"/,
+    /property="og:image" content="https:\/\/sakuracord\.app\/discord-preview-macbook-20260821\.png"/,
   );
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });
