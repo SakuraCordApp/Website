@@ -4,6 +4,8 @@ import handler from "vinext/server/app-router-entry";
 
 const LATEST_RELEASE_API =
   "https://api.github.com/repos/SakuraCordApp/SakuraCord/releases/latest";
+const RELEASES_API =
+  "https://api.github.com/repos/SakuraCordApp/SakuraCord/releases?per_page=20";
 const RELEASES_URL =
   "https://github.com/SakuraCordApp/SakuraCord/releases/latest";
 
@@ -12,7 +14,10 @@ interface GitHubRelease {
     browser_download_url?: string;
     content_type?: string;
     name?: string;
+    updated_at?: string;
   }>;
+  draft?: boolean;
+  prerelease?: boolean;
 }
 
 interface Env {
@@ -69,6 +74,75 @@ async function latestDmgResponse(request: Request): Promise<Response> {
   return Response.redirect(dmg.browser_download_url, 302);
 }
 
+async function nightlyAppcastResponse(request: Request): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: { Allow: "GET, HEAD" },
+    });
+  }
+
+  const releasesResponse = await fetch(RELEASES_API, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "SakuraCord-Website",
+    },
+    cf: {
+      cacheEverything: true,
+      cacheTtl: 60,
+    },
+  });
+
+  if (!releasesResponse.ok) {
+    return new Response("The nightly update feed is temporarily unavailable.", {
+      status: 502,
+    });
+  }
+
+  const releases = (await releasesResponse.json()) as GitHubRelease[];
+  const appcast = releases
+    .find((release) => !release.draft && release.prerelease)
+    ?.assets?.find(
+      (asset) =>
+        asset.name === "appcast.xml" && asset.browser_download_url,
+    );
+
+  if (!appcast?.browser_download_url) {
+    return new Response("No nightly update feed has been published.", {
+      status: 404,
+    });
+  }
+
+  const appcastURL = new URL(appcast.browser_download_url);
+  if (appcast.updated_at) {
+    appcastURL.searchParams.set("updated", appcast.updated_at);
+  }
+  const appcastResponse = await fetch(appcastURL, {
+    method: request.method,
+    cf: {
+      cacheEverything: true,
+      cacheTtl: 60,
+    },
+  });
+
+  if (!appcastResponse.ok) {
+    return new Response("The nightly update feed is temporarily unavailable.", {
+      status: 502,
+    });
+  }
+
+  const headers = new Headers(appcastResponse.headers);
+  headers.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  headers.set("Content-Type", "application/xml; charset=utf-8");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.delete("Content-Disposition");
+
+  return new Response(request.method === "HEAD" ? null : appcastResponse.body, {
+    status: 200,
+    headers,
+  });
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -81,6 +155,10 @@ const worker = {
 
     if (url.pathname === "/download") {
       return latestDmgResponse(request);
+    }
+
+    if (url.pathname === "/updates/appcast.xml") {
+      return nightlyAppcastResponse(request);
     }
 
     if (url.pathname === "/_vinext/image") {

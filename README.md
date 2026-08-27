@@ -44,6 +44,7 @@ social-platform caches.
 ## Important links
 
 - Latest DMG: `https://sakuracord.app/download`
+- Nightly Sparkle feed: `https://sakuracord.app/updates/appcast.xml`
 - Source: `https://github.com/SakuraCordApp/SakuraCord`
 - Discord: `https://discord.gg/hWNwFXkUTP`
 - Engineering roadmap: `https://roadmap.sakuracord.app`
