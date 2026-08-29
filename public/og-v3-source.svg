@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SakuraCord social preview, v3.
+  The product window is the real 2880x1584 client capture from /public/media.
+  Render at 1200x630 to update the PNG preview.
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">SakuraCord — Native SwiftUI, Voice and Video, and Blazing Fast</title>
+  <desc id="description">
+    SakuraCord wordmark above a high-resolution capture of the native macOS client.
+  </desc>
+
+  <defs>
+    <style>
+      @font-face {
+        font-family: "LADisplay";
+        src: url("fonts/LADisplay-VF.ttf") format("truetype");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "LAText";
+        src: url("fonts/LAText-VF.ttf") format("truetype");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+    </style>
+
+    <radialGradient id="bottom-glow" cx="50%" cy="100%" r="58%">
+      <stop offset="0" stop-color="#ee87b8" stop-opacity="0.16" />
+      <stop offset="0.42" stop-color="#c5538e" stop-opacity="0.055" />
+      <stop offset="1" stop-color="#c5538e" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="window-shadow" x="-8%" y="-18%" width="116%" height="145%">
+      <feDropShadow dx="0" dy="20" stdDeviation="26" flood-color="#000000" flood-opacity="0.68" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#07070a" />
+  <rect y="310" width="1200" height="320" fill="url(#bottom-glow)" />
+
+  <text
+    x="600"
+    y="111"
+    fill="#f09ac2"
+    font-family="LADisplay, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif"
+    font-size="76"
+    font-weight="740"
+    letter-spacing="-2.2"
+    text-anchor="middle"
+  >SakuraCord</text>
+
+  <text
+    x="600"
+    y="163"
+    fill="#e6e4e8"
+    font-family="LAText, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif"
+    font-size="26"
+    font-weight="520"
+    letter-spacing="-0.2"
+    text-anchor="middle"
+  >Native SwiftUI, Voice and Video, and Blazing Fast</text>
+
+  <g filter="url(#window-shadow)">
+    <image
+      x="68"
+      y="238"
+      width="1064"
+      height="585"
+      preserveAspectRatio="xMidYMin slice"
+      href="media/sakuracord-client-preview.webp"
+      xlink:href="media/sakuracord-client-preview.webp"
+    />
+  </g>
+</svg>
