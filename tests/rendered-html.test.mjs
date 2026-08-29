@@ -8,14 +8,14 @@ const STALE_DOWNLOAD_URL =
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
 const MAIN_SITE_URL = "https://sakuracord.app";
 
-async function render() {
+async function render(path = "/", headers = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
+    new Request(`http://localhost${path}`, {
+      headers: { accept: "text/html", ...headers },
     }),
     {
       ASSETS: {
@@ -58,7 +58,59 @@ test("server-renders the SakuraCord landing page", async () => {
     html,
     /property="og:image" content="https:\/\/sakuracord\.app\/discord-preview-macbook-20260821\.png"/,
   );
+  assert.match(html, /name="theme-color" content="#ef9bc4"/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
+});
+
+test("server-renders generic Discord metadata for every settings deeplink", async () => {
+  const discordHeaders = {
+    "user-agent":
+      "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+  };
+
+  for (const path of [
+    "/settings",
+    "/settings/update",
+    "/settings/themes/AQGKz_VpjwzNszNAALhRczO9cKZmwo_Zmcet62c",
+  ]) {
+    const response = await render(path, discordHeaders);
+    assert.equal(response.status, 200);
+
+    const html = await response.text();
+    assert.match(html, /<title>SakuraCord Settings Deeplink<\/title>/);
+    assert.match(html, /Open it in SakuraCord to use the linked setting/);
+    assert.match(
+      html,
+      new RegExp(
+        `property="og:url" content="https://sakuracord\\.app${path}"`,
+      ),
+    );
+    assert.match(
+      html,
+      /property="og:image" content="https:\/\/sakuracord\.app\/brand\/sakuracord-app-icon\.png"/,
+    );
+    assert.match(html, /property="og:image:width" content="1024"/);
+    assert.match(html, /property="og:image:height" content="1024"/);
+    assert.match(html, /property="og:image:type" content="image\/png"/);
+    assert.match(html, /name="twitter:card" content="summary"/);
+    assert.match(
+      html,
+      /name="twitter:image" content="https:\/\/sakuracord\.app\/brand\/sakuracord-app-icon\.png"/,
+    );
+    assert.match(html, /name="theme-color" content="#ef9bc4"/);
+  }
+});
+
+test("redirects every human settings request to the homepage", async () => {
+  for (const path of [
+    "/settings",
+    "/settings/update",
+    "/settings/themes/AQGKz_VpjwzNszNAALhRczO9cKZmwo_Zmcet62c",
+  ]) {
+    const response = await render(path);
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get("location"), "http://localhost/");
+  }
 });
 
 test("redirects downloads to the latest versioned DMG", async (t) => {
