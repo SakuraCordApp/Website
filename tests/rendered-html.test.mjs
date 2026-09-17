@@ -6,9 +6,9 @@ const DOWNLOAD_URL = "/download";
 const STALE_DOWNLOAD_URL =
   "https://github.com/SakuraCordApp/SakuraCord/releases/latest/download/SakuraCord.dmg";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
-const MAIN_SITE_URL = "https://sakuracord.app";
+const MAIN_SITE_URL = "/";
 
-async function render(path = "/", headers = {}) {
+async function render(path = "/", headers = {}, service) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -18,6 +18,7 @@ async function render(path = "/", headers = {}) {
       headers: { accept: "text/html", ...headers },
     }),
     {
+      ROADMAP: service,
       ASSETS: {
         fetch: async () => new Response("Not found", { status: 404 }),
       },
@@ -51,7 +52,7 @@ test("server-renders the SakuraCord landing page", async () => {
   assert.match(
     html,
     new RegExp(
-      `<a[^>]+class="brand-link"[^>]+href="${MAIN_SITE_URL.replaceAll(".", "\\.")}"`,
+      `<a(?=[^>]*class="brand-link")(?=[^>]*href="${MAIN_SITE_URL.replaceAll(".", "\\.")}")[^>]*>`,
     ),
   );
   assert.match(
@@ -81,9 +82,7 @@ test("server-renders generic Discord metadata for every settings deeplink", asyn
     assert.match(html, /Open it in SakuraCord to use the linked setting/);
     assert.match(
       html,
-      new RegExp(
-        `property="og:url" content="https://sakuracord\\.app${path}"`,
-      ),
+      new RegExp(`property="og:url" content="https://sakuracord\\.app${path}"`),
     );
     assert.match(
       html,
@@ -161,7 +160,7 @@ test("keeps the landing page accessible and resilient", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /className="skip-link"/);
+  assert.match(layout, /className="skip-link"/);
   assert.match(page, /aria-labelledby="hero-title"/);
   assert.match(page, /className="benefit-list"/);
   assert.match(page, /Discord, built as a Mac app\./);
@@ -180,4 +179,211 @@ test("keeps the landing page accessible and resilient", async () => {
   assert.match(layout, /colorScheme:\s*"dark"/);
   assert.match(packageJson, /"name": "sakuracord-website"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});
+
+const trackerConfig = {
+  areas: [{ id: "chat", label: "Chat" }],
+  itemTypes: [{ id: "feature", label: "New Features" }],
+  priorities: [{ id: "high", label: "High" }],
+  lifecycle: [{ id: "planned", label: "Planned", color: "#60a5fa" }],
+  publicSections: [{ id: "planned", label: "Planned", statuses: ["planned"] }],
+};
+const trackerItem = {
+  id: "SCR-01KYACC17TP89XBS7HWEW6FR5K",
+  title: "Improve voice controls",
+  description: "Make audio devices easier to select.",
+  type: "feature",
+  area: "chat",
+  status: "planned",
+  priority: "high",
+  labels: [],
+  revision: 1,
+  references: [],
+  linkedDiscordThreads: [],
+  acceptanceCriteria: [
+    {
+      id: "audio",
+      statement: "Devices can be selected",
+      satisfied: false,
+      evidence: [],
+    },
+  ],
+};
+function roadmapServiceFixture({ missing = false, requests = [] } = {}) {
+  return {
+    fetch: async (request) => {
+      assert.equal(request.method, "GET");
+      assert.equal(request.headers.get("Authorization"), null);
+      const url = new URL(request.url);
+      requests.push(url.pathname);
+      if (url.pathname === "/api/v1/config")
+        return Response.json(trackerConfig);
+      if (url.pathname === "/api/v1/items") {
+        // Exercise pagination as well as server rendering.
+        return Response.json(
+          url.searchParams.has("cursor")
+            ? { data: [trackerItem] }
+            : { data: [], nextCursor: "second-page" },
+        );
+      }
+      if (url.pathname.startsWith("/api/v1/items/"))
+        return missing
+          ? Response.json({ error: { message: "Not found" } }, { status: 404 })
+          : Response.json({ data: trackerItem });
+      if (url.pathname === "/api/v1/versions")
+        return Response.json({
+          data: [
+            {
+              id: "next",
+              version: "0.2.0",
+              title: "Better conversations",
+              state: "planned",
+              position: 1,
+              highlights: [{ id: "voice", title: "Improved voice calls" }],
+            },
+            {
+              id: "old",
+              version: "0.1.0",
+              title: "Released version",
+              state: "released",
+              position: 0,
+              highlights: [],
+            },
+          ],
+        });
+      throw new Error(`Unexpected public request: ${url}`);
+    },
+  };
+}
+
+test("server-renders roadmap and paginated tracker data with unified internal links", async () => {
+  const service = roadmapServiceFixture();
+  const roadmap = await render("/roadmap", {}, service);
+  assert.equal(roadmap.status, 200);
+  const roadmapHtml = await roadmap.text();
+  assert.match(roadmapHtml, /<h2>Better conversations<\/h2>/);
+  assert.match(roadmapHtml, /Improved voice calls/);
+  assert.doesNotMatch(roadmapHtml, /<h2>Released version<\/h2>/);
+  const tracker = await render("/tracker?priority=high", {}, service);
+  assert.equal(tracker.status, 200);
+  const html = await tracker.text();
+  assert.match(html, /Improve voice controls/);
+  assert.match(
+    html,
+    /href="\/tracker\/items\/SCR-01KYACC17TP89XBS7HWEW6FR5K\?priority=high"/,
+  );
+  assert.match(html, /href="\/roadmap"/);
+  assert.doesNotMatch(html, /Loading roadmap items/);
+  assert.match(
+    html,
+    /Devices can be selected/,
+    "The initial snapshot includes modal details",
+  );
+});
+
+test("direct tracker links render item content and canonical metadata", async () => {
+  const requests = [];
+  const response = await render(
+    `/tracker/items/${trackerItem.id}`,
+    {},
+    roadmapServiceFixture({ requests }),
+  );
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<dialog[^>]*open=""/);
+  assert.match(html, /Devices can be selected/);
+  assert.match(html, /aria-label="Close item"/);
+  assert.equal(
+    requests.filter((path) => path === "/api/v1/items").length,
+    2,
+    "metadata and layout share the same paginated snapshot",
+  );
+  assert.ok(
+    !requests.some((path) => path.startsWith("/api/v1/items/")),
+    "direct links reuse snapshot details",
+  );
+  assert.match(
+    html,
+    /<title>Improve voice controls · SakuraCord Tracker<\/title>/,
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `rel="canonical" href="https://sakuracord.app/tracker/items/${trackerItem.id}"`,
+    ),
+  );
+});
+
+test("missing tracker items produce a not-found response", async () => {
+  const response = await render(
+    "/tracker/items/missing",
+    {},
+    roadmapServiceFixture({ missing: true }),
+  );
+  const html = await response.text();
+  assert.ok(
+    response.status === 404 || html.includes('name="robots" content="noindex"'),
+    "404 status or streamed Next.js not-found marker",
+  );
+  assert.match(html, /Item not found/);
+});
+
+test("a public-data outage renders a retry state inside the shared site", async () => {
+  const service = {
+    fetch: async () => new Response("Unavailable", { status: 503 }),
+  };
+  for (const path of [
+    "/tracker?priority=high",
+    "/roadmap",
+    `/tracker/items/${trackerItem.id}`,
+  ]) {
+    const response = await render(path, {}, service);
+    const html = await response.text();
+    assert.match(html, /is temporarily unavailable/);
+    assert.match(html, /Try again/);
+    assert.match(html, /aria-label="Primary navigation"/);
+  }
+});
+
+test("tracker snapshot refresh uses ETags and recovers after an outage", async () => {
+  const service = roadmapServiceFixture();
+  const first = await render("/api/tracker", {}, service);
+  assert.equal(first.status, 200);
+  const snapshot = await first.json();
+  assert.deepEqual(snapshot.items, [trackerItem]);
+  assert.equal(first.headers.get("etag"), snapshot.etag);
+  const unchanged = await render(
+    "/api/tracker",
+    { "If-None-Match": snapshot.etag },
+    service,
+  );
+  assert.equal(unchanged.status, 304);
+  assert.equal(await unchanged.text(), "");
+
+  const unavailable = await render(
+    "/api/tracker",
+    {},
+    {
+      fetch: async () => new Response("Unavailable", { status: 503 }),
+    },
+  );
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.headers.get("cache-control"), "no-store");
+
+  const changed = {
+    ...trackerItem,
+    title: "Updated voice controls",
+    revision: 2,
+  };
+  const updated = await render(
+    "/api/tracker",
+    { "If-None-Match": snapshot.etag },
+    {
+      fetch: async () => Response.json({ data: [changed] }),
+    },
+  );
+  assert.equal(updated.status, 200);
+  const refreshed = await updated.json();
+  assert.notEqual(refreshed.etag, snapshot.etag);
+  assert.deepEqual(refreshed.items, [changed]);
 });

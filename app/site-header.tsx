@@ -2,6 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element -- Local brand icon is already optimized. */
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ListChecksIcon } from "@phosphor-icons/react/dist/csr/ListChecks";
 import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/csr/DownloadSimple";
 import { GithubLogoIcon } from "@phosphor-icons/react/dist/csr/GithubLogo";
 import { ListIcon } from "@phosphor-icons/react/dist/csr/List";
@@ -9,21 +12,11 @@ import { MapTrifoldIcon } from "@phosphor-icons/react/dist/csr/MapTrifold";
 import { useEffect, useRef, useState } from "react";
 import { DiscordMark } from "./discord-mark";
 
-type SiteHeaderProps = {
-  discordUrl: string;
-  downloadUrl: string;
-  githubUrl: string;
-  roadmapUrl: string;
-};
+const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
+const GITHUB_URL = "https://github.com/SakuraCordApp/SakuraCord";
 
-const MAIN_SITE_URL = "https://sakuracord.app";
-
-export function SiteHeader({
-  discordUrl,
-  downloadUrl,
-  githubUrl,
-  roadmapUrl,
-}: SiteHeaderProps) {
+export function SiteHeader() {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
@@ -59,11 +52,7 @@ export function SiteHeader({
   return (
     <header className="site-header" aria-label="Primary navigation">
       <div className="header-inner">
-        <a
-          className="brand-link"
-          href={MAIN_SITE_URL}
-          aria-label="SakuraCord home"
-        >
+        <Link className="brand-link" href="/" aria-label="SakuraCord home">
           <img
             src="/brand/favicon.png"
             alt=""
@@ -72,7 +61,7 @@ export function SiteHeader({
             aria-hidden="true"
           />
           <span translate="no">SakuraCord</span>
-        </a>
+        </Link>
 
         <button
           ref={menuButtonRef}
@@ -90,10 +79,27 @@ export function SiteHeader({
           ref={navigationRef}
           id="primary-navigation"
           className={menuOpen ? "nav-links is-open" : "nav-links"}
-          aria-label="External links"
+          aria-label="SakuraCord links"
         >
+          <Link
+            href="/roadmap"
+            aria-current={pathname === "/roadmap" ? "page" : undefined}
+            onClick={() => setMenuOpen(false)}
+          >
+            <MapTrifoldIcon aria-hidden="true" weight="regular" />
+            <span>Roadmap</span>
+          </Link>
+          <Link
+            href="/tracker"
+            prefetch={false}
+            aria-current={pathname.startsWith("/tracker") ? "page" : undefined}
+            onClick={() => setMenuOpen(false)}
+          >
+            <ListChecksIcon aria-hidden="true" weight="regular" />
+            <span>Tracker</span>
+          </Link>
           <a
-            href={discordUrl}
+            href={DISCORD_URL}
             target="_blank"
             rel="noreferrer"
             onClick={() => setMenuOpen(false)}
@@ -102,7 +108,7 @@ export function SiteHeader({
             <span>Discord</span>
           </a>
           <a
-            href={githubUrl}
+            href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
             onClick={() => setMenuOpen(false)}
@@ -111,17 +117,8 @@ export function SiteHeader({
             <span>GitHub</span>
           </a>
           <a
-            href={roadmapUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => setMenuOpen(false)}
-          >
-            <MapTrifoldIcon aria-hidden="true" weight="regular" />
-            <span>Roadmap</span>
-          </a>
-          <a
             className="header-download"
-            href={downloadUrl}
+            href="/download"
             aria-label="Download SakuraCord alpha for macOS"
             onClick={() => setMenuOpen(false)}
           >

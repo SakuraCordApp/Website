@@ -1,6 +1,11 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
-import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
+import {
+  handleImageOptimization,
+  DEFAULT_DEVICE_SIZES,
+  DEFAULT_IMAGE_SIZES,
+} from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { roadmapService } from "./roadmap-context";
 
 const LATEST_RELEASE_API =
   "https://api.github.com/repos/SakuraCordApp/SakuraCord/releases/latest";
@@ -18,23 +23,6 @@ interface GitHubRelease {
   }>;
   draft?: boolean;
   prerelease?: boolean;
-}
-
-interface Env {
-  ASSETS: Fetcher;
-  DB: D1Database;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
-}
-
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-  passThroughOnException(): void;
 }
 
 async function latestDmgResponse(request: Request): Promise<Response> {
@@ -63,8 +51,7 @@ async function latestDmgResponse(request: Request): Promise<Response> {
   const release = (await releaseResponse.json()) as GitHubRelease;
   const dmg = release.assets?.find(
     (asset) =>
-      asset.name?.toLowerCase().endsWith(".dmg") &&
-      asset.browser_download_url,
+      asset.name?.toLowerCase().endsWith(".dmg") && asset.browser_download_url,
   );
 
   if (!dmg?.browser_download_url) {
@@ -103,8 +90,7 @@ async function nightlyAppcastResponse(request: Request): Promise<Response> {
   const appcast = releases
     .find((release) => !release.draft && release.prerelease)
     ?.assets?.find(
-      (asset) =>
-        asset.name === "appcast.xml" && asset.browser_download_url,
+      (asset) => asset.name === "appcast.xml" && asset.browser_download_url,
     );
 
   if (!appcast?.browser_download_url) {
@@ -132,7 +118,10 @@ async function nightlyAppcastResponse(request: Request): Promise<Response> {
   }
 
   const headers = new Headers(appcastResponse.headers);
-  headers.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  headers.set(
+    "Cache-Control",
+    "public, max-age=60, stale-while-revalidate=300",
+  );
   headers.set("Content-Type", "application/xml; charset=utf-8");
   headers.set("X-Content-Type-Options", "nosniff");
   headers.delete("Content-Disposition");
@@ -150,7 +139,11 @@ async function nightlyAppcastResponse(request: Request): Promise<Response> {
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/download") {
@@ -163,16 +156,60 @@ const worker = {
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
-        transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
-          return result.response();
+      return handleImageOptimization(
+        request,
+        {
+          fetchAsset: (path) =>
+            env.ASSETS.fetch(new Request(new URL(path, request.url))),
+          transformImage: async (body, { width, format, quality }) => {
+            if (
+              format !== "image/jpeg" &&
+              format !== "image/png" &&
+              format !== "image/gif" &&
+              format !== "image/webp" &&
+              format !== "image/avif"
+            ) {
+              throw new Error("Unsupported image format");
+            }
+            const result = await env.IMAGES.input(body)
+              .transform(width > 0 ? { width } : {})
+              .output({ format, quality });
+            return result.response();
+          },
         },
-      }, allowedWidths);
+        allowedWidths,
+      );
     }
 
-    return handler.fetch(request, env, ctx);
+    // Only the public version stream is forwarded. No credentials or mutation
+    // routes are exposed through the website.
+    if (url.pathname === "/api/roadmap/versions/events") {
+      if (request.method !== "GET")
+        return new Response("Method not allowed", {
+          status: 405,
+          headers: { Allow: "GET" },
+        });
+      const response = await env.ROADMAP.fetch(
+        new Request("https://roadmap.sakuracord.app/api/v1/versions/events", {
+          headers: { Accept: "text/event-stream" },
+          signal: request.signal,
+        }),
+      );
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type":
+            response.headers.get("Content-Type") ?? "text/event-stream",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    return roadmapService.run(
+      { fetch: (input) => env.ROADMAP.fetch(input), responses: new Map() },
+      () => handler.fetch(request, env, ctx),
+    );
   },
 };
 

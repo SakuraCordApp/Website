@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./community.css";
+import { SiteHeader } from "./site-header";
+import { SiteFooter } from "./site-footer";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://sakuracord.app"),
@@ -50,7 +53,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {/* Register before the router so tracker-only history can stay local. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'window.addEventListener("popstate",function(event){window.sakuracordTrackerHistory?.(event)},true);',
+          }}
+        />
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
+        <SiteHeader />
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }

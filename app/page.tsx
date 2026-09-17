@@ -8,12 +8,12 @@ import { MemoryIcon } from "@phosphor-icons/react/dist/ssr/Memory";
 import { VideoCameraIcon } from "@phosphor-icons/react/dist/ssr/VideoCamera";
 import { DiscordMark } from "./discord-mark";
 import { Reveal } from "./reveal";
-import { SiteHeader } from "./site-header";
+import Link from "next/link";
 
 const DOWNLOAD_URL = "/download";
 const GITHUB_URL = "https://github.com/SakuraCordApp/SakuraCord";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
-const ROADMAP_URL = "https://roadmap.sakuracord.app";
+const ROADMAP_URL = "/roadmap";
 
 const discordComponentEmbed = {
   component: {
@@ -79,20 +79,12 @@ export default function Home() {
         id="discord:component-embed"
         type="application/json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(discordComponentEmbed).replace(/</g, "\\u003c"),
+          __html: JSON.stringify(discordComponentEmbed).replace(
+            /</g,
+            "\\u003c",
+          ),
         }}
       />
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
-
-      <SiteHeader
-        discordUrl={DISCORD_URL}
-        downloadUrl={DOWNLOAD_URL}
-        githubUrl={GITHUB_URL}
-        roadmapUrl={ROADMAP_URL}
-      />
-
       <main id="main-content">
         <section
           className="hero section-shell"
@@ -216,7 +208,7 @@ export default function Home() {
                   weight="bold"
                 />
               </a>
-              <a href={ROADMAP_URL} {...externalLinkProps}>
+              <Link href={ROADMAP_URL}>
                 <MapTrifoldIcon aria-hidden="true" weight="regular" />
                 <span>Roadmap</span>
                 <ArrowUpRightIcon
@@ -224,7 +216,7 @@ export default function Home() {
                   aria-hidden="true"
                   weight="bold"
                 />
-              </a>
+              </Link>
             </Reveal>
           </div>
         </section>
@@ -267,27 +259,6 @@ export default function Home() {
               </a>
             </Reveal>
           </div>
-
-          <footer className="section-shell site-footer">
-            <a
-              className="brand-link"
-              href="#top"
-              aria-label="Back to SakuraCord home"
-            >
-              <img
-                src="/brand/favicon.png"
-                alt=""
-                width={38}
-                height={38}
-                aria-hidden="true"
-              />
-              <span translate="no">SakuraCord</span>
-            </a>
-            <p>
-              SakuraCord is an independent project and is not affiliated with
-              Discord.
-            </p>
-          </footer>
         </section>
       </main>
     </>

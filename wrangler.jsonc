@@ -4,7 +4,9 @@
   "account_id": "20aea060f70461a418cf31bc70b79cdc",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-07-27",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "routes": [
     {
       "pattern": "sakuracord.app",
@@ -21,5 +23,12 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "services": [
+    {
+      "binding": "ROADMAP",
+      "service": "sakuracord-roadmap",
+      "remote": true
+    }
+  ]
 }
