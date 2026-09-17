@@ -15,6 +15,40 @@ const GITHUB_URL = "https://github.com/SakuraCordApp/SakuraCord";
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
 const ROADMAP_URL = "https://roadmap.sakuracord.app";
 
+const discordComponentEmbed = {
+  component: {
+    type: 17,
+    accent_color: 0xef9bc4,
+    components: [
+      {
+        type: 12,
+        items: [
+          {
+            media: {
+              url: "https://sakuracord.app/discord-preview-macbook-20260821.png",
+            },
+            description:
+              "SakuraCord running on a MacBook beneath the SakuraCord wordmark",
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 5,
+            label: "Website",
+            url: "https://sakuracord.app",
+          },
+          { type: 2, style: 5, label: "GitHub", url: GITHUB_URL },
+          { type: 2, style: 5, label: "Discord", url: DISCORD_URL },
+        ],
+      },
+    ],
+  },
+};
+
 const externalLinkProps = {
   target: "_blank",
   rel: "noreferrer",
@@ -41,6 +75,13 @@ const benefits = [
 export default function Home() {
   return (
     <>
+      <script
+        id="discord:component-embed"
+        type="application/json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(discordComponentEmbed).replace(/</g, "\\u003c"),
+        }}
+      />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
