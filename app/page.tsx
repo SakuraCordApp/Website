@@ -21,6 +21,11 @@ const discordComponentEmbed = {
     accent_color: 0xef9bc4,
     components: [
       {
+        type: 10,
+        content:
+          "# SakuraCord\nYour Discord servers, chats, and calls in an app that feels at home on the Mac—with familiar keyboard shortcuts, native menus, and lower memory use. Currently in alpha for macOS 27 and later.",
+      },
+      {
         type: 12,
         items: [
           {
