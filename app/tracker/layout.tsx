@@ -1,16 +1,18 @@
+import type { ReactNode } from "react";
 import { CommunityUnavailable } from "../community-unavailable";
-import { getConfig, getTrackerSnapshot } from "../lib/roadmap";
+import { getTrackerSnapshot } from "../lib/roadmap";
 import { TrackerWorkspace } from "./tracker-workspace";
 
-export default async function TrackerLayout() {
-  const data = await Promise.all([getConfig(), getTrackerSnapshot()]).catch(
-    () => null,
-  );
-  if (!data) return <CommunityUnavailable title="Tracker" />;
-  const [config, snapshot] = data;
+export default async function TrackerLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const snapshot = await getTrackerSnapshot().catch(() => null);
+  if (!snapshot) return <CommunityUnavailable title="Tracker" />;
   return (
     <main id="main-content" className="community-page section-shell">
-      <TrackerWorkspace config={config} snapshot={snapshot} />
+      <TrackerWorkspace snapshot={snapshot}>{children}</TrackerWorkspace>
     </main>
   );
 }

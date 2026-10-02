@@ -9,6 +9,7 @@ import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/csr/DownloadSimpl
 import { GithubLogoIcon } from "@phosphor-icons/react/dist/csr/GithubLogo";
 import { ListIcon } from "@phosphor-icons/react/dist/csr/List";
 import { MapTrifoldIcon } from "@phosphor-icons/react/dist/csr/MapTrifold";
+import { BugBeetleIcon } from "@phosphor-icons/react/dist/csr/BugBeetle";
 import { useEffect, useRef, useState } from "react";
 import { DiscordMark } from "./discord-mark";
 
@@ -97,6 +98,15 @@ export function SiteHeader() {
           >
             <ListChecksIcon aria-hidden="true" weight="regular" />
             <span>Tracker</span>
+          </Link>
+          <Link
+            href="/report"
+            prefetch={false}
+            aria-current={pathname.startsWith("/report") ? "page" : undefined}
+            onClick={() => setMenuOpen(false)}
+          >
+            <BugBeetleIcon aria-hidden="true" weight="regular" />
+            <span>Report</span>
           </Link>
           <a
             href={DISCORD_URL}

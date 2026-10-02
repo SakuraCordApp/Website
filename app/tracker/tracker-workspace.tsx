@@ -8,62 +8,140 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
+  useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
-import type { PublicConfig, TrackerSnapshot } from "../lib/roadmap-types";
-import { TrackerContext } from "./tracker-context";
+import type {
+  IssueDetail,
+  SessionUser,
+  TrackerIssue,
+  TrackerSnapshot,
+} from "../lib/roadmap-types";
+import { TrackerContext, statusLabel } from "./tracker-context";
 import { ItemDialog } from "./item-dialog";
 import ItemNotFound from "./items/[id]/not-found";
 import { useTrackerNavigation } from "./use-tracker-navigation";
 import { useTrackerSnapshot } from "./use-tracker-snapshot";
 
+const SHIPPED_WINDOW_DAYS = 60;
+
+const COLUMNS = [
+  { id: "review", label: "Under review", statuses: ["new", "needs_info"] },
+  {
+    id: "accepted",
+    label: "Accepted",
+    bugLabel: "Confirmed",
+    statuses: ["confirmed"],
+  },
+  { id: "planned", label: "Planned", statuses: ["planned"] },
+  {
+    id: "progress",
+    label: "In progress",
+    statuses: ["in_progress", "in_nightly"],
+  },
+  { id: "shipped", label: "Recently shipped", statuses: ["shipped", "done"] },
+];
+
+const SORTS = {
+  votes: (a: TrackerIssue, b: TrackerIssue) =>
+    b.votes - a.votes || b.updatedAt.localeCompare(a.updatedAt),
+  newest: (a: TrackerIssue, b: TrackerIssue) => b.number - a.number,
+  updated: (a: TrackerIssue, b: TrackerIssue) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+};
+
 export function TrackerWorkspace({
-  config,
   snapshot,
+  children,
 }: {
-  config: PublicConfig;
   snapshot: TrackerSnapshot;
+  children?: ReactNode;
 }) {
   const params = useSearchParams();
-  const { items } = useTrackerSnapshot(snapshot);
+  const { issues, meta } = useTrackerSnapshot(snapshot);
   const { itemId, openItem, closeItem, returnFocus } = useTrackerNavigation();
-  const itemsById = useMemo(
-    () => new Map(items.map((item) => [item.id, item])),
-    [items],
-  );
-  const selectedItem = itemId ? itemsById.get(itemId) : undefined;
+  const details = useRef(new Map<number, IssueDetail>());
+  const [session, setSession] = useState<{
+    user: SessionUser | null;
+    signInAvailable: boolean;
+  } | null>(null);
   useEffect(() => {
-    document.title = selectedItem
-      ? `${selectedItem.title} · SakuraCord Tracker`
+    fetch("/api/report/session", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((value) =>
+        setSession(
+          value as {
+            user: SessionUser | null;
+            signInAvailable: boolean;
+          } | null,
+        ),
+      )
+      .catch(() => setSession(null));
+  }, []);
+  const byNumber = useMemo(
+    () => new Map(issues.map((issue) => [issue.number, issue])),
+    [issues],
+  );
+  const selectedNumber = itemId && /^\d+$/.test(itemId) ? Number(itemId) : null;
+  const selected = selectedNumber ? byNumber.get(selectedNumber) : undefined;
+  useEffect(() => {
+    document.title = selected
+      ? `${selected.title} · SakuraCord Tracker`
       : "Tracker · SakuraCord";
-  }, [selectedItem]);
+  }, [selected]);
+
   const search = params.get("search") ?? "";
   const priority = params.get("priority") ?? "";
   const kind = params.get("kind") ?? "";
+  const area = params.get("area") ?? "";
   const status = params.get("status") ?? "";
+  const sort = (params.get("sort") ?? "votes") as keyof typeof SORTS;
   const deferredSearch = useDeferredValue(search);
-  const visibleStatuses = useMemo(
-    () => new Set(config.publicSections.flatMap((section) => section.statuses)),
-    [config.publicSections],
+  const closedStatus = meta.statuses.find(
+    (option) => option.id === status && !option.open,
+  );
+  const [shippedCutoff] = useState(
+    () => Date.now() - SHIPPED_WINDOW_DAYS * 86_400_000,
   );
   const filtered = useMemo(
     () =>
-      items.filter((item) => {
-        if (!visibleStatuses.has(item.status)) return false;
-        if (priority && item.priority !== priority) return false;
-        if (kind && item.type !== kind) return false;
-        if (status && item.status !== status) return false;
-        const query = deferredSearch.trim().toLocaleLowerCase();
-        return (
-          !query ||
-          `${item.id} ${item.title} ${item.description}`
-            .toLocaleLowerCase()
-            .includes(query)
-        );
-      }),
-    [items, visibleStatuses, priority, kind, status, deferredSearch],
+      issues
+        .filter((issue) => {
+          if (priority && issue.priority !== priority) return false;
+          if (kind && issue.kind !== kind) return false;
+          if (area && issue.area !== area) return false;
+          if (status && issue.status !== status) return false;
+          const query = deferredSearch.trim().toLocaleLowerCase();
+          return (
+            !query ||
+            `#${issue.number} ${issue.title} ${issue.summary ?? ""}`
+              .toLocaleLowerCase()
+              .includes(query)
+          );
+        })
+        .sort(SORTS[sort] ?? SORTS.votes),
+    [issues, priority, kind, area, status, deferredSearch, sort],
   );
-  const hasFilters = Boolean(search || priority || kind || status);
+  const columns = closedStatus
+    ? [
+        {
+          id: closedStatus.id,
+          label: closedStatus.label,
+          statuses: [closedStatus.id],
+        },
+      ]
+    : COLUMNS.filter((column) => !status || column.statuses.includes(status));
+  const inColumn = (issue: TrackerIssue, statuses: string[]) =>
+    statuses.includes(issue.status) &&
+    (closedStatus ||
+      !["shipped", "done"].includes(issue.status) ||
+      Date.parse(issue.closedAt ?? issue.updatedAt) >= shippedCutoff);
+  const visibleCount = filtered.filter((issue) =>
+    columns.some((column) => inColumn(issue, column.statuses)),
+  ).length;
+  const hasFilters = Boolean(search || priority || kind || area || status);
   const query = params.toString();
 
   function updateFilter(name: string, value: string) {
@@ -78,15 +156,34 @@ export function TrackerWorkspace({
   }
 
   return (
-    <TrackerContext value={{ config, closeItem, returnFocus }}>
+    <TrackerContext
+      value={{
+        meta,
+        issues: byNumber,
+        closeItem,
+        returnFocus,
+        details,
+        session,
+      }}
+    >
       <header className="community-heading">
         <div>
           <h1>Tracker</h1>
-          <p>Features, fixes, and community reports.</p>
+          <p>
+            Every SakuraCord bug and suggestion, synced with Discord and GitHub.
+          </p>
         </div>
-        <Link className="community-text-link" href="/roadmap">
-          View the roadmap <span aria-hidden="true">↗</span>
-        </Link>
+        <div className="community-heading-actions">
+          <Link className="community-button" href="/report?type=bug">
+            Report a bug
+          </Link>
+          <Link
+            className="community-button is-secondary"
+            href="/report?type=feature"
+          >
+            Suggest a feature
+          </Link>
+        </div>
       </header>
       <form
         className="tracker-filters"
@@ -94,15 +191,43 @@ export function TrackerWorkspace({
         onSubmit={(event) => event.preventDefault()}
       >
         <label className="tracker-search">
-          <span>Search changes</span>
+          <span>Search</span>
           <input
             type="search"
             name="search"
-            placeholder="Search the tracker…"
+            placeholder="Search by title or #number…"
             autoComplete="off"
             value={search}
             onChange={(event) => updateFilter("search", event.target.value)}
           />
+        </label>
+        <label>
+          <span>Type</span>
+          <select
+            value={kind}
+            onChange={(event) => updateFilter("kind", event.target.value)}
+          >
+            <option value="">Bugs & features</option>
+            {meta.kinds.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.plural}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Area</span>
+          <select
+            value={area}
+            onChange={(event) => updateFilter("area", event.target.value)}
+          >
+            <option value="">All areas</option>
+            {meta.areas.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           <span>Priority</span>
@@ -111,21 +236,7 @@ export function TrackerWorkspace({
             onChange={(event) => updateFilter("priority", event.target.value)}
           >
             <option value="">All priorities</option>
-            {config.priorities.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Category</span>
-          <select
-            value={kind}
-            onChange={(event) => updateFilter("kind", event.target.value)}
-          >
-            <option value="">All categories</option>
-            {config.itemTypes.map((option) => (
+            {meta.priorities.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
               </option>
@@ -138,20 +249,29 @@ export function TrackerWorkspace({
             value={status}
             onChange={(event) => updateFilter("status", event.target.value)}
           >
-            <option value="">All statuses</option>
-            {config.lifecycle
-              .filter((option) => visibleStatuses.has(option.id))
-              .map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
+            <option value="">Active & recently shipped</option>
+            {meta.statuses.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select
+            value={sort}
+            onChange={(event) => updateFilter("sort", event.target.value)}
+          >
+            <option value="votes">Most votes</option>
+            <option value="newest">Newest</option>
+            <option value="updated">Recently updated</option>
           </select>
         </label>
       </form>
       <div className="tracker-results">
         <p aria-live="polite">
-          {filtered.length} {filtered.length === 1 ? "change" : "changes"}
+          {visibleCount} {visibleCount === 1 ? "report" : "reports"}
         </p>
         {hasFilters ? (
           <button type="button" onClick={clearFilters}>
@@ -160,8 +280,8 @@ export function TrackerWorkspace({
         ) : null}
       </div>
       <div id="browse" className="tracker-board">
-        {config.itemTypes.map((type) => {
-          const group = filtered.filter((item) => item.type === type.id);
+        {meta.kinds.map((type) => {
+          const group = filtered.filter((issue) => issue.kind === type.id);
           if (!group.length) return null;
           return (
             <section
@@ -170,94 +290,99 @@ export function TrackerWorkspace({
               aria-labelledby={`category-${type.id}`}
             >
               <h2 id={`category-${type.id}`}>
-                {type.id === "feature"
-                  ? "Features"
-                  : type.id === "bug"
-                    ? "Bugs"
-                    : type.label}
+                {type.plural}
                 <span>{group.length}</span>
               </h2>
-              <div className="tracker-columns">
-                {config.publicSections
-                  .filter(
-                    (section) => !status || section.statuses.includes(status),
-                  )
-                  .map((section) => (
+              <div
+                className="tracker-columns"
+                style={{ "--columns": columns.length } as CSSProperties}
+              >
+                {columns.map((column) => {
+                  const lane = group.filter((issue) =>
+                    inColumn(issue, column.statuses),
+                  );
+                  const color = meta.statuses.find(
+                    (option) => option.id === column.statuses[0],
+                  )?.color;
+                  return (
                     <section
                       className="tracker-column"
-                      key={section.id}
-                      aria-labelledby={`${type.id}-${section.id}`}
+                      key={column.id}
+                      aria-labelledby={`${type.id}-${column.id}`}
                     >
                       <h3
-                        id={`${type.id}-${section.id}`}
-                        style={
-                          {
-                            "--status-color": config.lifecycle.find((option) =>
-                              section.statuses.includes(option.id),
-                            )?.color,
-                          } as CSSProperties
-                        }
+                        id={`${type.id}-${column.id}`}
+                        style={{ "--status-color": color } as CSSProperties}
                       >
-                        {section.label}
-                        <span className="column-count">
-                          {
-                            group.filter((item) =>
-                              section.statuses.includes(item.status),
-                            ).length
-                          }
-                        </span>
+                        {type.id === "bug" && "bugLabel" in column
+                          ? column.bugLabel
+                          : column.label}
+                        <span className="column-count">{lane.length}</span>
                       </h3>
                       <div className="tracker-lane-items">
-                        {group
-                          .filter((item) =>
-                            section.statuses.includes(item.status),
-                          )
-                          .map((item) => (
-                            <a
-                              className="tracker-card"
-                              key={item.id}
-                              href={`/tracker/items/${encodeURIComponent(item.id)}${query ? `?${query}` : ""}`}
-                              onClick={openItem}
-                              aria-label={`${item.title}, ${config.priorities.find((option) => option.id === item.priority)?.label ?? item.priority} priority`}
-                            >
-                              <img
-                                className="tracker-priority-icon"
-                                src={`/brand/priority/${item.priority}.svg`}
-                                width={64}
-                                height={64}
-                                loading="lazy"
-                                alt=""
-                                title={`${config.priorities.find((option) => option.id === item.priority)?.label ?? item.priority} priority`}
-                              />
-                              <span>{item.title}</span>
-                            </a>
-                          ))}
-                        {!group.some((item) =>
-                          section.statuses.includes(item.status),
-                        ) ? (
-                          <p className="tracker-empty-lane">No changes here.</p>
+                        {lane.map((issue) => (
+                          <a
+                            className="tracker-card"
+                            key={issue.number}
+                            href={`/tracker/items/${issue.number}${query ? `?${query}` : ""}`}
+                            onClick={openItem}
+                            aria-label={`#${issue.number} ${issue.title}, ${statusLabel(meta, issue.status, issue.kind)}, ${issue.votes} votes`}
+                          >
+                            <img
+                              className="tracker-priority-icon"
+                              src={`/brand/priority/${issue.priority ?? "medium"}.svg`}
+                              width={64}
+                              height={64}
+                              loading="lazy"
+                              alt=""
+                            />
+                            <span>
+                              {issue.title}
+                              <small className="tracker-card-meta">
+                                #{issue.number}
+                                {issue.votes ? ` · 👍 ${issue.votes}` : ""}
+                                {issue.status === "in_nightly"
+                                  ? " · In nightly"
+                                  : ""}
+                                {issue.status === "needs_info"
+                                  ? " · Needs info"
+                                  : ""}
+                                {issue.milestone && column.id !== "shipped"
+                                  ? ` · v${issue.milestone}`
+                                  : ""}
+                                {issue.shippedIn && column.id === "shipped"
+                                  ? ` · ${issue.shippedIn}`
+                                  : ""}
+                              </small>
+                            </span>
+                          </a>
+                        ))}
+                        {!lane.length ? (
+                          <p className="tracker-empty-lane">Nothing here.</p>
                         ) : null}
                       </div>
                     </section>
-                  ))}
+                  );
+                })}
               </div>
             </section>
           );
         })}
-        {!filtered.length ? (
+        {!visibleCount ? (
           <div className="community-empty">
-            <h2>{hasFilters ? "No changes match" : "No changes yet"}</h2>
+            <h2>{hasFilters ? "No reports match" : "No reports yet"}</h2>
             <p>
               {hasFilters
                 ? "Try another search or clear the filters."
-                : "Published changes will appear here."}
+                : "Reports will appear here."}
             </p>
           </div>
         ) : null}
       </div>
+      {children}
       {itemId ? (
-        selectedItem ? (
-          <ItemDialog key={itemId} item={selectedItem} />
+        selected ? (
+          <ItemDialog key={itemId} issue={selected} />
         ) : (
           <ItemNotFound />
         )

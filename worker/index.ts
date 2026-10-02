@@ -181,33 +181,12 @@ const worker = {
       );
     }
 
-    // Only the public version stream is forwarded. No credentials or mutation
-    // routes are exposed through the website.
-    if (url.pathname === "/api/roadmap/versions/events") {
-      if (request.method !== "GET")
-        return new Response("Method not allowed", {
-          status: 405,
-          headers: { Allow: "GET" },
-        });
-      const response = await env.ROADMAP.fetch(
-        new Request("https://roadmap.sakuracord.app/api/v1/versions/events", {
-          headers: { Accept: "text/event-stream" },
-          signal: request.signal,
-        }),
-      );
-      return new Response(response.body, {
-        status: response.status,
-        headers: {
-          "Content-Type":
-            response.headers.get("Content-Type") ?? "text/event-stream",
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
-    }
-
     return roadmapService.run(
-      { fetch: (input) => env.ROADMAP.fetch(input), responses: new Map() },
+      {
+        fetch: (input) => env.ROADMAP.fetch(input),
+        responses: new Map(),
+        env,
+      },
       () => handler.fetch(request, env, ctx),
     );
   },

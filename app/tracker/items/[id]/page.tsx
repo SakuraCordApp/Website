@@ -1,33 +1,42 @@
 import type { Metadata } from "next";
+import { notFound, permanentRedirect } from "next/navigation";
 import { communityMetadata } from "../../../lib/community-metadata";
-import { notFound } from "next/navigation";
-import { getItems } from "../../../lib/roadmap";
+import { getIssueDetail, resolveLegacyId } from "../../../lib/roadmap";
+import { SeedDetail } from "../../seed-detail";
 import ItemError from "./error";
 
 type Props = { params: Promise<{ id: string }> };
+
 async function loadItem(id: string) {
-  let items;
+  if (!/^\d+$/.test(id)) {
+    const number = await resolveLegacyId(id);
+    if (number) permanentRedirect(`/tracker/items/${number}`);
+    notFound();
+  }
+  let detail;
   try {
-    items = await getItems();
+    detail = await getIssueDetail(Number(id));
   } catch {
     return null;
   }
-  const item = items.find((item) => item.id === id);
-  if (!item) notFound();
-  return item;
+  if (!detail) notFound();
+  return detail;
 }
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const item = await loadItem(id);
   return communityMetadata(
     item ? `${item.title} · SakuraCord Tracker` : "SakuraCord Tracker",
-    item?.description.slice(0, 160) ??
-      "Track features, fixes, and community reports.",
+    item?.summary?.slice(0, 160) ??
+      item?.sections[0]?.text.slice(0, 160) ??
+      "Track SakuraCord bugs and suggestions.",
     `/tracker/items/${encodeURIComponent(id)}`,
   );
 }
+
 export default async function ItemPage({ params }: Props) {
   const { id } = await params;
   const item = await loadItem(id);
-  return item ? null : <ItemError />;
+  return item ? <SeedDetail detail={item} /> : <ItemError />;
 }

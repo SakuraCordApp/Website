@@ -1,14 +1,20 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Report media is served by the hub's attachment proxy. */
+
 import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
   type CSSProperties,
+  type ReactNode,
 } from "react";
-import type { Reference, TrackerItem } from "../lib/roadmap-types";
-import { useTracker } from "./tracker-context";
+import type {
+  IssueDetail,
+  TimelineEntry,
+  TrackerIssue,
+} from "../lib/roadmap-types";
+import { statusLabel, useTracker } from "./tracker-context";
 
 export function TrackerDialog({
   title,
@@ -74,132 +80,406 @@ export function TrackerDialog({
   );
 }
 
-export function ItemDialog({ item }: { item: TrackerItem }) {
-  const { config } = useTracker();
-  const [copyStatus, setCopyStatus] = useState("");
-  const status = config.lifecycle.find((option) => option.id === item.status);
-  const references = [...item.references];
-  for (const thread of item.linkedDiscordThreads) {
-    if (!references.some((reference) => reference.url === thread.url))
-      references.push({
-        label: thread.title || "Discord report",
-        url: thread.url,
-      });
+async function loadDetail(number: number): Promise<IssueDetail> {
+  const response = await fetch(`/api/tracker/items/${number}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(String(response.status));
+  return (await response.json()) as IssueDetail;
+}
+
+function useDetail(number: number) {
+  const { details } = useTracker();
+  const [detail, setDetail] = useState<IssueDetail | null>(
+    () => details.current.get(number) ?? null,
+  );
+  const [failed, setFailed] = useState(false);
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    loadDetail(number).then(
+      (next) => {
+        if (cancelled) return;
+        details.current.set(number, next);
+        setDetail(next);
+        setFailed(false);
+      },
+      () => {
+        if (!cancelled) setFailed(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [number, version, details]);
+  return { detail, failed, reload: () => setVersion((value) => value + 1) };
+}
+
+/** Links and bold text in comments, without rendering untrusted HTML. */
+function RichText({ text }: { text: string }) {
+  const parts: ReactNode[] = [];
+  const pattern =
+    /!?\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+)|\*\*([^*]+)\*\*|`([^`]+)`/g;
+  let last = 0;
+  for (const match of text.matchAll(pattern)) {
+    if (match.index! > last) parts.push(text.slice(last, match.index));
+    const key = `${match.index}`;
+    if (match[2])
+      parts.push(
+        <a key={key} href={match[2]} target="_blank" rel="noreferrer">
+          {match[1] || match[2]}
+        </a>,
+      );
+    else if (match[3])
+      parts.push(
+        <a key={key} href={match[3]} target="_blank" rel="noreferrer">
+          {match[3]}
+        </a>,
+      );
+    else if (match[4]) parts.push(<strong key={key}>{match[4]}</strong>);
+    else if (match[5]) parts.push(<code key={key}>{match[5]}</code>);
+    last = match.index! + match[0].length;
   }
+  if (last < text.length) parts.push(text.slice(last));
+  return <p className="rich-text">{parts}</p>;
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  discord: "Discord",
+  github: "GitHub",
+  website: "sakuracord.app",
+};
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function TimelineItem({ entry, kind }: { entry: TimelineEntry; kind: string }) {
+  const { meta } = useTracker();
+  const data = entry.data as Record<string, string | number | boolean | null>;
+  if (entry.kind === "comment") {
+    const avatar = typeof data.avatarUrl === "string" ? data.avatarUrl : null;
+    return (
+      <li className="timeline-comment">
+        {avatar ? (
+          <img
+            className="timeline-avatar"
+            src={avatar}
+            alt=""
+            width={32}
+            height={32}
+          />
+        ) : (
+          <span className="timeline-avatar is-empty" aria-hidden="true">
+            {data.agent ? "🔎" : String(data.author ?? "?").slice(0, 1)}
+          </span>
+        )}
+        <div>
+          <p className="timeline-meta">
+            <strong>{String(data.author ?? "Someone")}</strong>
+            <span className="source-badge">
+              {data.agent
+                ? "Investigation agent"
+                : (SOURCE_LABEL[String(data.source)] ?? "GitHub")}
+            </span>
+            {typeof data.url === "string" ? (
+              <a href={data.url} target="_blank" rel="noreferrer">
+                {formatDate(entry.createdAt)}
+              </a>
+            ) : (
+              <span>{formatDate(entry.createdAt)}</span>
+            )}
+          </p>
+          <RichText text={String(data.body ?? "")} />
+        </div>
+      </li>
+    );
+  }
+  let text: string | null = null;
+  if (entry.kind === "created")
+    text = data.migrated ? "Imported from the previous tracker" : "Reported";
+  if (entry.kind === "status")
+    text = `Moved to ${statusLabel(meta, String(data.to), kind)}`;
+  if (entry.kind === "shipped") text = `Shipped in SakuraCord ${data.version}`;
+  if (entry.kind === "merged")
+    text = `#${data.from} was merged into this report`;
+  if (entry.kind === "me-too")
+    text = `${data.name} has the same ${kind === "feature" ? "request" : "problem"}`;
+  if (entry.kind === "details") text = `${data.name} added details`;
+  if (entry.kind === "fix")
+    text = data.pr
+      ? `Fix in progress in PR #${data.pr}`
+      : `Fixed in commit ${String(data.sha ?? "").slice(0, 7)}`;
+  if (!text) return null;
   return (
-    <TrackerDialog title={item.title}>
+    <li className="timeline-event">
+      <span className="status-dot" aria-hidden="true" />
+      <span>{text}</span>
+      <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time>
+    </li>
+  );
+}
+
+export function ItemDialog({ issue }: { issue: TrackerIssue }) {
+  const { meta, session } = useTracker();
+  const { detail, failed, reload } = useDetail(issue.number);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [comment, setComment] = useState("");
+  const status = meta.statuses.find((option) => option.id === issue.status);
+  const area = meta.areas.find((option) => option.id === issue.area);
+  const priority = meta.priorities.find(
+    (option) => option.id === issue.priority,
+  );
+  const signInHref = `/report/login?next=${encodeURIComponent(`/tracker/items/${issue.number}`)}`;
+  const open = status?.open ?? true;
+
+  async function post(path: string, body: object, success: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Something went wrong.");
+      setMessage(success);
+      reload();
+      return true;
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong.",
+      );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <TrackerDialog title={issue.title}>
       <div className="item-identity">
-        <code>{item.id}</code>
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(item.id);
-              setCopyStatus("ID copied");
-            } catch {
-              setCopyStatus("Select the ID to copy it.");
-            }
-          }}
-        >
-          Copy ID
-        </button>
-        <span role="status">{copyStatus}</span>
+        <code>#{issue.number}</code>
+        <a href={issue.url} target="_blank" rel="noreferrer">
+          GitHub ↗
+        </a>
+        {issue.threadUrl ? (
+          <a href={issue.threadUrl} target="_blank" rel="noreferrer">
+            Discord post ↗
+          </a>
+        ) : null}
       </div>
       <p className="item-status">
         <span
           className="status-dot"
           style={{ "--status-color": status?.color } as CSSProperties}
         />
-        {status?.label ?? item.status}
+        {statusLabel(meta, issue.status, issue.kind)}
+        {status ? (
+          <span className="item-status-note">· {status.description}</span>
+        ) : null}
       </p>
-      <h1>{item.title}</h1>
+      <h1>{issue.title}</h1>
       <dl className="item-facts">
         <div>
-          <dt>Priority</dt>
-          <dd>
-            <span className={`priority-marker priority-${item.priority}`} />
-            {config.priorities.find((option) => option.id === item.priority)
-              ?.label ?? item.priority}
-          </dd>
+          <dt>Type</dt>
+          <dd>{issue.kind === "feature" ? "Feature" : "Bug"}</dd>
         </div>
-        <div>
-          <dt>Category</dt>
-          <dd>
-            {config.itemTypes.find((option) => option.id === item.type)
-              ?.label ?? item.type}
-          </dd>
-        </div>
-        <div>
-          <dt>Area</dt>
-          <dd>
-            {config.areas.find((option) => option.id === item.area)?.label ??
-              item.area}
-          </dd>
-        </div>
-        {item.labels.length ? (
+        {priority ? (
           <div>
-            <dt>Type</dt>
+            <dt>Priority</dt>
             <dd>
-              {item.labels
-                .map((label) => label.replaceAll("_", " "))
-                .join(", ")}
+              <span className={`priority-marker priority-${priority.id}`} />
+              {priority.label}
             </dd>
           </div>
         ) : null}
+        {area ? (
+          <div>
+            <dt>Area</dt>
+            <dd>
+              {area.emoji} {area.label}
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Votes</dt>
+          <dd>👍 {detail?.votes ?? issue.votes}</dd>
+        </div>
+        {issue.milestone ? (
+          <div>
+            <dt>Version</dt>
+            <dd>v{issue.milestone}</dd>
+          </div>
+        ) : null}
+        {detail?.reporter ? (
+          <div>
+            <dt>Reported by</dt>
+            <dd className="is-plain">{detail.reporter.name}</dd>
+          </div>
+        ) : null}
       </dl>
-      <p className="item-description">{item.description}</p>
-      {item.acceptanceCriteria.length ? (
-        <section className="item-section">
-          <h2>Acceptance criteria</h2>
-          <ul className="item-criteria">
-            {item.acceptanceCriteria.map((criterion) => (
-              <li key={criterion.id}>
-                <span
-                  className={
-                    criterion.satisfied
-                      ? "criterion-check is-satisfied"
-                      : "criterion-check"
-                  }
-                  aria-label={
-                    criterion.satisfied ? "Satisfied" : "Not yet satisfied"
-                  }
-                >
-                  {criterion.satisfied ? "✓" : "○"}
-                </span>
-                <div>
-                  <p>{criterion.statement}</p>
-                  <References references={criterion.evidence} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {references.length ? (
-        <section className="item-section">
-          <h2>Report sources</h2>
-          <References references={references} />
-        </section>
-      ) : null}
-    </TrackerDialog>
-  );
-}
-function References({ references }: { references: Reference[] }) {
-  if (!references.length) return null;
-  return (
-    <ul className="item-references">
-      {references.map((reference, index) => (
-        <li key={`${reference.url ?? reference.label}-${index}`}>
-          {reference.url && /^https?:\/\//i.test(reference.url) ? (
-            <a href={reference.url} target="_blank" rel="noreferrer">
-              {reference.label} <span aria-hidden="true">↗</span>
+      {open ? (
+        <div className="item-actions">
+          {session?.user ? (
+            <button
+              type="button"
+              className="community-button"
+              disabled={busy}
+              onClick={() =>
+                post(
+                  "/api/report/me-too",
+                  { number: issue.number },
+                  "👍 You're following this report and will be pinged in Discord when it ships.",
+                )
+              }
+            >
+              👍 Me too
+            </button>
+          ) : session?.signInAvailable ? (
+            <a className="community-button" href={signInHref}>
+              Sign in with Discord to vote or comment
             </a>
-          ) : (
-            <span>{reference.label}</span>
-          )}
-          {reference.value ? <p>{reference.value}</p> : null}
-        </li>
-      ))}
-    </ul>
+          ) : null}
+          <span role="status" className="item-action-status">
+            {message}
+          </span>
+        </div>
+      ) : null}
+      {detail ? (
+        <>
+          {detail.sections.map((section) => (
+            <section className="item-section is-compact" key={section.heading}>
+              <h2>{section.heading}</h2>
+              <p className="item-description">{section.text}</p>
+            </section>
+          ))}
+          {detail.attachments.length ? (
+            <section className="item-section">
+              <h2>Attachments</h2>
+              <div className="item-gallery">
+                {detail.attachments.map((attachment) =>
+                  attachment.image ? (
+                    <a
+                      key={attachment.url}
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img
+                        src={attachment.url}
+                        alt={attachment.name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      key={attachment.url}
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {attachment.name} ↗
+                    </a>
+                  ),
+                )}
+              </div>
+            </section>
+          ) : null}
+          {detail.fixes.length ? (
+            <section className="item-section">
+              <h2>Fixes</h2>
+              <ul className="item-references">
+                {detail.fixes.map((fix) => (
+                  <li key={fix.url}>
+                    <a href={fix.url} target="_blank" rel="noreferrer">
+                      {fix.kind === "pr"
+                        ? `PR #${fix.number}`
+                        : `Commit ${fix.sha?.slice(0, 7)}`}
+                      {fix.title ? ` · ${fix.title}` : ""} ↗
+                    </a>
+                    <p>
+                      {fix.state === "merged"
+                        ? "Merged"
+                        : fix.state === "open"
+                          ? "Open"
+                          : "Closed"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <section className="item-section">
+            <h2>Activity</h2>
+            <ol className="item-timeline">
+              {detail.timeline.map((entry, index) => (
+                <TimelineItem
+                  key={`${entry.kind}-${entry.createdAt}-${index}`}
+                  entry={entry}
+                  kind={issue.kind}
+                />
+              ))}
+            </ol>
+            {open && session?.user ? (
+              <form
+                className="item-comment-form"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (
+                    await post(
+                      "/api/report/comment",
+                      { number: issue.number, text: comment },
+                      "Comment posted to GitHub and Discord.",
+                    )
+                  )
+                    setComment("");
+                }}
+              >
+                <label>
+                  <span>Add a comment as {session.user.name}</span>
+                  <textarea
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                    rows={3}
+                    maxLength={6000}
+                    placeholder="Share details, a workaround, or how it affects you…"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="community-button"
+                  disabled={busy || !comment.trim()}
+                >
+                  Comment
+                </button>
+              </form>
+            ) : null}
+          </section>
+        </>
+      ) : failed ? (
+        <div className="community-empty">
+          <p>Details are temporarily unavailable.</p>
+          <button className="community-retry" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          {issue.summary ? (
+            <p className="item-description">{issue.summary}</p>
+          ) : null}
+          <p className="community-loading" role="status">
+            Loading details…
+          </p>
+        </>
+      )}
+    </TrackerDialog>
   );
 }

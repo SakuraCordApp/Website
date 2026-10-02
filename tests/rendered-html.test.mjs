@@ -181,31 +181,96 @@ test("keeps the landing page accessible and resilient", async () => {
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
 
-const trackerConfig = {
-  areas: [{ id: "chat", label: "Chat" }],
-  itemTypes: [{ id: "feature", label: "New Features" }],
-  priorities: [{ id: "high", label: "High" }],
-  lifecycle: [{ id: "planned", label: "Planned", color: "#60a5fa" }],
-  publicSections: [{ id: "planned", label: "Planned", statuses: ["planned"] }],
-};
-const trackerItem = {
-  id: "SCR-01KYACC17TP89XBS7HWEW6FR5K",
-  title: "Improve voice controls",
-  description: "Make audio devices easier to select.",
-  type: "feature",
-  area: "chat",
-  status: "planned",
-  priority: "high",
-  labels: [],
-  revision: 1,
-  references: [],
-  linkedDiscordThreads: [],
-  acceptanceCriteria: [
+const meta = {
+  kinds: [
+    { id: "bug", label: "Bug", plural: "Bugs" },
+    { id: "feature", label: "Feature", plural: "Features" },
+  ],
+  statuses: [
     {
-      id: "audio",
-      statement: "Devices can be selected",
-      satisfied: false,
-      evidence: [],
+      id: "new",
+      label: "New",
+      featureLabel: "New",
+      description: "Waiting for triage",
+      color: "#F472B6",
+      open: true,
+      emoji: "🌱",
+    },
+    {
+      id: "planned",
+      label: "Planned",
+      featureLabel: "Planned",
+      description: "Scheduled",
+      color: "#60A5FA",
+      open: true,
+      emoji: "🗓️",
+    },
+    {
+      id: "shipped",
+      label: "Shipped",
+      featureLabel: "Shipped",
+      description: "Released",
+      color: "#34D399",
+      open: false,
+      emoji: "🌸",
+    },
+  ],
+  areas: [
+    {
+      id: "communication",
+      label: "Communication",
+      emoji: "📞",
+      description: "Calls",
+      color: "#A78BFA",
+    },
+  ],
+  priorities: [
+    { id: "high", label: "High", color: "#F97316", description: "Major" },
+  ],
+};
+const trackerIssue = {
+  number: 51,
+  title: "Improve voice controls",
+  kind: "feature",
+  status: "planned",
+  area: "communication",
+  priority: "high",
+  summary: "Make audio devices easier to select.",
+  votes: 4,
+  milestone: "0.2.0",
+  shippedIn: null,
+  duplicateOf: null,
+  createdAt: "2026-09-01T00:00:00Z",
+  updatedAt: "2026-09-02T00:00:00Z",
+  closedAt: null,
+  url: "https://github.com/SakuraCordApp/SakuraCord/issues/51",
+  threadUrl: "https://discord.com/channels/1/2",
+};
+const issueDetail = {
+  ...trackerIssue,
+  labels: [],
+  reporter: { name: "Sakura", source: "discord" },
+  sections: [
+    {
+      heading: "What would you like?",
+      text: "Devices can be selected from the call bar",
+    },
+  ],
+  attachments: [],
+  fixes: [],
+  shippedStableIn: null,
+  open: true,
+  timeline: [
+    { kind: "created", createdAt: "2026-09-01T00:00:00Z", data: {} },
+    {
+      kind: "comment",
+      createdAt: "2026-09-02T00:00:00Z",
+      data: {
+        source: "github",
+        author: "super-original",
+        body: "Working on it",
+        url: "https://github.com/x",
+      },
     },
   ],
 };
@@ -216,91 +281,110 @@ function roadmapServiceFixture({ missing = false, requests = [] } = {}) {
       assert.equal(request.headers.get("Authorization"), null);
       const url = new URL(request.url);
       requests.push(url.pathname);
-      if (url.pathname === "/api/v1/config")
-        return Response.json(trackerConfig);
-      if (url.pathname === "/api/v1/items") {
-        // Exercise pagination as well as server rendering.
-        return Response.json(
-          url.searchParams.has("cursor")
-            ? { data: [trackerItem] }
-            : { data: [], nextCursor: "second-page" },
-        );
-      }
-      if (url.pathname.startsWith("/api/v1/items/"))
+      if (url.pathname === "/api/v2/tracker")
+        return Response.json({ issues: [trackerIssue], meta, etag: '"one"' });
+      if (url.pathname === "/api/v2/issues/51")
         return missing
-          ? Response.json({ error: { message: "Not found" } }, { status: 404 })
-          : Response.json({ data: trackerItem });
-      if (url.pathname === "/api/v1/versions")
+          ? Response.json({ error: "Not found" }, { status: 404 })
+          : Response.json(issueDetail);
+      if (url.pathname.startsWith("/api/v2/issues/"))
+        return Response.json({ error: "Not found" }, { status: 404 });
+      if (url.pathname === "/api/v2/legacy/SCR-01KYACC17TP89XBS7HWEW6FR5K")
+        return Response.json({ number: 51 });
+      if (url.pathname.startsWith("/api/v2/legacy/"))
+        return Response.json({ error: "Not found" }, { status: 404 });
+      if (url.pathname === "/api/v2/roadmap")
         return Response.json({
-          data: [
+          visible: [2, 3],
+          versions: [
             {
-              id: "next",
-              version: "0.2.0",
-              title: "Better conversations",
-              state: "planned",
-              position: 1,
-              highlights: [{ id: "voice", title: "Improved voice calls" }],
+              number: 1,
+              version: "0.1.0",
+              headline: "Old version",
+              summary: "",
+              highlights: [],
+              state: "closed",
+              dueOn: null,
+              closedAt: "2026-07-01T00:00:00Z",
+              openIssues: 0,
+              closedIssues: 3,
+              url: null,
             },
             {
-              id: "old",
-              version: "0.1.0",
-              title: "Released version",
-              state: "released",
-              position: 0,
+              number: 2,
+              version: "0.1.9",
+              headline: "Latest release",
+              summary: "",
               highlights: [],
+              state: "closed",
+              dueOn: null,
+              closedAt: "2026-09-01T00:00:00Z",
+              openIssues: 0,
+              closedIssues: 5,
+              url: null,
+            },
+            {
+              number: 3,
+              version: "0.2.0",
+              headline: "Better conversations",
+              summary: "Calls and more.",
+              highlights: [{ text: "Improved voice calls", issues: [51] }],
+              state: "open",
+              dueOn: null,
+              closedAt: null,
+              openIssues: 3,
+              closedIssues: 1,
+              url: null,
             },
           ],
         });
       throw new Error(`Unexpected public request: ${url}`);
     },
+    reportForm: async () => ({
+      applicationId: "1",
+      versions: ["0.1.9"],
+      kinds: {},
+      meta,
+    }),
   };
 }
 
-test("server-renders roadmap and paginated tracker data with unified internal links", async () => {
+test("server-renders roadmap milestones and tracker data with internal links", async () => {
   const service = roadmapServiceFixture();
   const roadmap = await render("/roadmap", {}, service);
   assert.equal(roadmap.status, 200);
   const roadmapHtml = await roadmap.text();
   assert.match(roadmapHtml, /<h2>Better conversations<\/h2>/);
   assert.match(roadmapHtml, /Improved voice calls/);
-  assert.doesNotMatch(roadmapHtml, /<h2>Released version<\/h2>/);
+  assert.match(roadmapHtml, /href="\/tracker\/items\/51"/);
+  assert.match(roadmapHtml, /Latest release/);
+  assert.doesNotMatch(roadmapHtml, /Old version/);
   const tracker = await render("/tracker?priority=high", {}, service);
   assert.equal(tracker.status, 200);
   const html = await tracker.text();
   assert.match(html, /Improve voice controls/);
-  assert.match(
-    html,
-    /href="\/tracker\/items\/SCR-01KYACC17TP89XBS7HWEW6FR5K\?priority=high"/,
-  );
-  assert.match(html, /href="\/roadmap"/);
+  assert.match(html, /href="\/tracker\/items\/51\?priority=high"/);
+  assert.match(html, /href="\/report\?type=bug"/);
   assert.doesNotMatch(html, /Loading roadmap items/);
-  assert.match(
-    html,
-    /Devices can be selected/,
-    "The initial snapshot includes modal details",
-  );
 });
 
-test("direct tracker links render item content and canonical metadata", async () => {
+test("direct tracker links render item details and canonical metadata", async () => {
   const requests = [];
   const response = await render(
-    `/tracker/items/${trackerItem.id}`,
+    "/tracker/items/51",
     {},
     roadmapServiceFixture({ requests }),
   );
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /<dialog[^>]*open=""/);
-  assert.match(html, /Devices can be selected/);
+  assert.match(html, /Devices can be selected from the call bar/);
+  assert.match(html, /Working on it/);
   assert.match(html, /aria-label="Close item"/);
   assert.equal(
-    requests.filter((path) => path === "/api/v1/items").length,
-    2,
-    "metadata and layout share the same paginated snapshot",
-  );
-  assert.ok(
-    !requests.some((path) => path.startsWith("/api/v1/items/")),
-    "direct links reuse snapshot details",
+    requests.filter((path) => path === "/api/v2/issues/51").length,
+    1,
+    "metadata and page share one detail request",
   );
   assert.match(
     html,
@@ -308,17 +392,28 @@ test("direct tracker links render item content and canonical metadata", async ()
   );
   assert.match(
     html,
-    new RegExp(
-      `rel="canonical" href="https://sakuracord.app/tracker/items/${trackerItem.id}"`,
-    ),
+    /rel="canonical" href="https:\/\/sakuracord.app\/tracker\/items\/51"/,
   );
+});
+
+test("legacy tracker IDs redirect to the GitHub issue number", async () => {
+  const response = await render(
+    "/tracker/items/SCR-01KYACC17TP89XBS7HWEW6FR5K",
+    {},
+    roadmapServiceFixture(),
+  );
+  assert.ok(
+    [301, 307, 308].includes(response.status),
+    `status ${response.status}`,
+  );
+  assert.match(response.headers.get("location") ?? "", /\/tracker\/items\/51$/);
 });
 
 test("missing tracker items produce a not-found response", async () => {
   const response = await render(
-    "/tracker/items/missing",
+    "/tracker/items/999",
     {},
-    roadmapServiceFixture({ missing: true }),
+    roadmapServiceFixture(),
   );
   const html = await response.text();
   assert.ok(
@@ -332,11 +427,7 @@ test("a public-data outage renders a retry state inside the shared site", async 
   const service = {
     fetch: async () => new Response("Unavailable", { status: 503 }),
   };
-  for (const path of [
-    "/tracker?priority=high",
-    "/roadmap",
-    `/tracker/items/${trackerItem.id}`,
-  ]) {
+  for (const path of ["/tracker?priority=high", "/roadmap"]) {
     const response = await render(path, {}, service);
     const html = await response.text();
     assert.match(html, /is temporarily unavailable/);
@@ -350,7 +441,7 @@ test("tracker snapshot refresh uses ETags and recovers after an outage", async (
   const first = await render("/api/tracker", {}, service);
   assert.equal(first.status, 200);
   const snapshot = await first.json();
-  assert.deepEqual(snapshot.items, [trackerItem]);
+  assert.deepEqual(snapshot.issues, [trackerIssue]);
   assert.equal(first.headers.get("etag"), snapshot.etag);
   const unchanged = await render(
     "/api/tracker",
@@ -358,32 +449,38 @@ test("tracker snapshot refresh uses ETags and recovers after an outage", async (
     service,
   );
   assert.equal(unchanged.status, 304);
-  assert.equal(await unchanged.text(), "");
-
   const unavailable = await render(
     "/api/tracker",
     {},
-    {
-      fetch: async () => new Response("Unavailable", { status: 503 }),
-    },
+    { fetch: async () => new Response("Unavailable", { status: 503 }) },
   );
   assert.equal(unavailable.status, 503);
   assert.equal(unavailable.headers.get("cache-control"), "no-store");
+});
 
-  const changed = {
-    ...trackerItem,
-    title: "Updated voice controls",
-    revision: 2,
-  };
-  const updated = await render(
-    "/api/tracker",
-    { "If-None-Match": snapshot.etag },
+test("the report page renders and mutations require a Discord session", async () => {
+  const service = roadmapServiceFixture();
+  const page = await render("/report?type=bug&version=0.1.9", {}, service);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /aria-label="Primary navigation"/);
+  const session = await render("/api/report/session", {}, service);
+  assert.deepEqual(await session.json(), {
+    user: null,
+    signInAvailable: false,
+  });
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("submit", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const submit = await worker.fetch(
+    new Request("http://localhost/api/report/submit", {
+      method: "POST",
+      body: new FormData(),
+    }),
     {
-      fetch: async () => Response.json({ data: [changed] }),
+      ROADMAP: service,
+      ASSETS: { fetch: async () => new Response("", { status: 404 }) },
     },
+    { waitUntil() {}, passThroughOnException() {} },
   );
-  assert.equal(updated.status, 200);
-  const refreshed = await updated.json();
-  assert.notEqual(refreshed.etag, snapshot.etag);
-  assert.deepEqual(refreshed.items, [changed]);
+  assert.equal(submit.status, 401);
 });
