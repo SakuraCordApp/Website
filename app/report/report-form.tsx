@@ -15,8 +15,13 @@ import type {
 } from "../lib/roadmap-types";
 
 const DRAFT_KEY = "sakuracord-report-draft";
-const FROM_SOURCE = "Built from source";
-const UNKNOWN = "Other / not sure";
+const normalizeVersion = (value: string) =>
+  value
+    .trim()
+    .replace(/^v(?=\d)/i, "")
+    .replace(/-beta-/i, " beta ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 
 type Session = { user: SessionUser | null; signInAvailable: boolean };
 type Outcome = { report: FiledReport; existing: boolean };
@@ -62,6 +67,14 @@ export function ReportForm() {
       .then(([definition, currentSession]) => {
         setForm(definition as Omit<ReportFormDefinition, "applicationId">);
         setSession(currentSession as Session);
+        setValues((current) => {
+          const version = (definition as ReportFormDefinition).versions.find(
+            (entry) =>
+              normalizeVersion(entry) ===
+              normalizeVersion(current.version ?? ""),
+          );
+          return version ? { ...current, version } : current;
+        });
       })
       .catch(() => setLoadError(true));
   }, []);
@@ -297,8 +310,8 @@ export function ReportForm() {
             <aside className="report-similar" aria-live="polite">
               <h2>Already reported?</h2>
               <p>
-                If one of these is the same, add yourself to it — you&apos;ll get the
-                same updates.
+                If one of these is the same, add yourself to it — you&apos;ll
+                get the same updates.
               </p>
               <ul>
                 {visibleSimilar.map((report) => (
@@ -314,6 +327,7 @@ export function ReportForm() {
                       <small>
                         {report.statusLabel}
                         {report.votes ? ` · 👍 ${report.votes}` : ""}
+                        {report.resolution ? ` · ${report.resolution}` : ""}
                       </small>
                     </div>
                     {report.open ? (
@@ -340,7 +354,15 @@ export function ReportForm() {
         </p>
       ) : null}
       <div className="report-submit">
-        <button type="submit" className="community-button" disabled={busy}>
+        <button
+          type="submit"
+          className="community-button"
+          disabled={
+            busy ||
+            !form.versions.length ||
+            Boolean(values.version && !form.versions.includes(values.version))
+          }
+        >
           {busy
             ? "Sending…"
             : session.user
@@ -421,17 +443,9 @@ function Field({
             value: option.value,
             label: option.label,
           }))
-        : [
-            ...new Set([
-              ...(value ? [value] : []),
-              ...versions,
-              FROM_SOURCE,
-              UNKNOWN,
-            ]),
-          ].map((version) => ({
-            value: version,
-            label: version,
-          }));
+        : versions.map((version) => ({ value: version, label: version }));
+    const unsupported =
+      field.kind === "version" && value && !versions.includes(value);
     return (
       <label className="report-field">
         <span>
@@ -446,13 +460,25 @@ function Field({
           <option value="">
             {field.kind === "area" ? "Not sure" : "Choose a version"}
           </option>
+          {unsupported ? (
+            <option value={value} disabled>
+              {value} — update required
+            </option>
+          ) : null}
           {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
         </select>
-        {hint ? <small>{hint}</small> : null}
+        {unsupported ? (
+          <small role="alert">
+            Update to the latest nightly or regular release, retest, then select
+            that version.
+          </small>
+        ) : hint ? (
+          <small>{hint}</small>
+        ) : null}
       </label>
     );
   }

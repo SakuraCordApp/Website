@@ -126,6 +126,7 @@ export interface SimilarReport {
   url: string;
   trackerUrl: string;
   threadUrl: string | null;
+  resolution: string | null;
 }
 
 export interface ReportField {

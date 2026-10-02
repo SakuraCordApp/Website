@@ -75,7 +75,11 @@ its `/api/v2` read cache through the website's `ROADMAP` service binding.
 conversation; `/roadmap` displays GitHub milestones. Legacy `SCR-…` links
 redirect to their migrated issue numbers.
 
-`/report` uses the hub's shared form schema and duplicate search. Discord OAuth
+`/report` uses the hub's shared form schema and duplicate search. Both bugs and
+suggestions accept only the latest published nightly or regular release. Old
+app-prefilled versions require updating and retesting; the server validates the
+selected version again before filing. Duplicate suggestions include closed
+reports and available fix/release information. Discord OAuth
 (`identify` only) establishes a signed, HttpOnly session cookie. Verified users
 can submit reports, follow existing issues, and comment. The website passes
 that identity to hub RPC methods; browser clients never receive bot tokens,
