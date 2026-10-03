@@ -86,9 +86,17 @@ that identity to hub RPC methods; browser clients never receive bot tokens,
 GitHub credentials, or the session-signing secret. Comments are mirrored to
 GitHub and Discord.
 
-The app's Help menu can prefill version, macOS, and hardware fields through
-query parameters. These values remain editable and are only filed when the
-user submits. The login flow preserves the draft.
+Older app builds open `/report` with version, macOS, and hardware query
+parameters. These values remain editable and are only filed when the user
+submits. The login flow preserves the draft.
+
+Current app builds file reports natively through the same APIs. On submit, the
+app authorizes the `identify` scope for `/report/callback` with the person's
+Discord session on their Mac, without following the redirect, and posts only
+the one-time code and the signed state from `GET /api/report/app/authorize`
+back to that route. The response is a bearer session in the same signed format
+as the cookie; `/api/report/submit` and `/api/report/me-too` accept either.
+The app never sends its Discord credential to the website.
 
 Runtime secrets `DISCORD_CLIENT_SECRET` and `SESSION_SECRET` live in Cloudflare;
 maintainer copies are in Keychain. Code changes deploy only through the

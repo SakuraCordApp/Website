@@ -1,7 +1,8 @@
 import type { SessionUser } from "./roadmap-types";
 
-// Discord sign-in for website reports. The session is a signed cookie holding
-// the verified Discord identity; no server-side session storage is needed.
+// Discord sign-in for reports. The session is a signed token holding the
+// verified Discord identity: a cookie on the website, a bearer token in the
+// SakuraCord app. No server-side session storage is needed.
 
 export const SESSION_COOKIE = "sc_session";
 export const OAUTH_COOKIE = "sc_oauth";
@@ -50,27 +51,28 @@ export async function verify<T extends { exp: number }>(
   token: string | undefined,
   secret: string,
 ): Promise<T | null> {
-  if (!token || !token.includes(".")) return null;
-  const [body, signature] = token.split(".");
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    fromBase64Url(signature!),
-    encoder.encode(body!),
-  );
-  if (!valid) return null;
+  if (typeof token !== "string") return null;
   try {
+    const parts = token.split(".");
+    if (parts.length !== 2 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part)))
+      return null;
+    const [body, signature] = parts;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC", key, fromBase64Url(signature!), encoder.encode(body!),
+    );
+    if (!valid) return null;
     const payload = JSON.parse(
       new TextDecoder().decode(fromBase64Url(body!)),
     ) as T;
-    return payload.exp > Date.now() ? payload : null;
+    return payload && typeof payload.exp === "number" && payload.exp > Date.now()
+      ? payload : null;
   } catch {
     return null;
   }
@@ -100,11 +102,15 @@ export async function readSession(
   secret: string | undefined,
 ): Promise<SessionUser | null> {
   if (!secret) return null;
+  const bearer = request.headers
+    .get("Authorization")
+    ?.match(/^Bearer\s+(\S+)$/i)?.[1];
   const payload = await verify<SessionUser & { exp: number }>(
-    readCookie(request, SESSION_COOKIE),
+    bearer ?? readCookie(request, SESSION_COOKIE),
     secret,
   );
-  if (!payload) return null;
+  // State tokens share the signing key; only identities are sessions.
+  if (!payload || typeof payload.id !== "string") return null;
   return {
     id: payload.id,
     username: payload.username,

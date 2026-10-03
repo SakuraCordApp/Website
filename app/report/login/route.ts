@@ -1,3 +1,4 @@
+import { callbackUrl } from "../../lib/discord-identity";
 import { hub, websiteSecrets } from "../../lib/roadmap";
 import { OAUTH_COOKIE, cookie, safeNext, sign } from "../../lib/session";
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   authorize.search = new URLSearchParams({
     client_id: applicationId,
     response_type: "code",
-    redirect_uri: `${url.origin}/report/callback`,
+    redirect_uri: callbackUrl(url.origin),
     scope: "identify",
     state,
     prompt: "none",

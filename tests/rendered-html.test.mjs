@@ -484,3 +484,58 @@ test("the report page renders and mutations require a Discord session", async ()
   );
   assert.equal(submit.status, 401);
 });
+
+test("native report sign-in accepts only verified identities and rejects malformed bearer tokens", async (t) => {
+  const { default: worker } = await import("../dist/server/index.js");
+  const user = { id: "123456789012345678", username: "fixture", global_name: "Fixture" };
+  const calls = [];
+  const env = {
+    SESSION_SECRET: "local-test-session-secret",
+    DISCORD_CLIENT_SECRET: "local-test-client-secret",
+    ROADMAP: {
+      reportForm: async () => ({ applicationId: "1530180517155176458" }),
+      meToo: async (input) => { calls.push(input); return { number: input.number }; },
+    },
+    ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+  };
+  const invoke = (path, init) => worker.fetch(
+    new Request(`https://sakuracord.app${path}`, init), env,
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  const post = (body, token) => ({
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (url === "https://discord.com/api/v10/oauth2/token") {
+      assert.equal(init.body.get("code"), "fixture-code");
+      assert.equal(init.body.get("redirect_uri"), "https://sakuracord.app/report/callback");
+      return Response.json({ access_token: "fixture-access-token" });
+    }
+    assert.equal(url, "https://discord.com/api/v10/users/@me");
+    assert.equal(init.headers.Authorization, "Bearer fixture-access-token");
+    return Response.json(user);
+  });
+  const start = await invoke("/api/report/app/authorize");
+  assert.equal(start.status, 200);
+  const { state } = await start.json();
+  for (const token of [state, "bad.%", "bad.signature.extra"]) {
+    const denied = await invoke("/api/report/me-too", post({ number: 42 }, token));
+    assert.equal(denied.status, 401);
+  }
+  assert.equal(calls.length, 0);
+  const exchange = await invoke("/api/report/app/authorize", post({ code: "fixture-code", state }));
+  assert.equal(exchange.status, 200);
+  const session = await exchange.json();
+  assert.equal(session.user.id, user.id);
+  assert.ok(session.expiresAt > Date.now());
+  const followed = await invoke("/api/report/me-too", post({ number: 42 }, session.token));
+  assert.equal(followed.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].user.id, user.id);
+  const cookieRequest = post({ number: 43 });
+  cookieRequest.headers.Cookie = `sc_session=${session.token}`;
+  assert.equal((await invoke("/api/report/me-too", cookieRequest)).status, 200);
+  assert.equal(calls[1].user.id, user.id);
+});
