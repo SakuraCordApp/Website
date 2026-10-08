@@ -23,6 +23,73 @@ interface GitHubRelease {
   }>;
   draft?: boolean;
   prerelease?: boolean;
+  tag_name?: string;
+}
+
+const isDmg = (name?: string) => Boolean(name?.toLowerCase().endsWith(".dmg"));
+
+/** "v0.1.6-Beta-5" → "0.1.6 Beta 5". */
+function versionLabel(tag?: string) {
+  return tag ? tag.replace(/^v/, "").replace(/-/g, " ") : null;
+}
+
+async function recentReleases(): Promise<GitHubRelease[] | null> {
+  const response = await fetch(RELEASES_API, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "SakuraCord-Website",
+    },
+    cf: {
+      cacheEverything: true,
+      cacheTtl: 300,
+    },
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as GitHubRelease[];
+}
+
+/** The newest published release and the newest nightly, each with a DMG. */
+function pickReleases(releases: GitHubRelease[]) {
+  const withDmg = releases.filter(
+    (release) =>
+      !release.draft && release.assets?.some((asset) => isDmg(asset.name)),
+  );
+  return {
+    release: withDmg.find((release) => !release.prerelease) ?? null,
+    nightly: withDmg.find((release) => release.prerelease) ?? null,
+  };
+}
+
+async function nightlyDmgResponse(request: Request): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: { Allow: "GET, HEAD" },
+    });
+  }
+  const releases = await recentReleases();
+  const nightly = releases ? pickReleases(releases).nightly : null;
+  const dmg = nightly?.assets?.find(
+    (asset) => isDmg(asset.name) && asset.browser_download_url,
+  );
+  return Response.redirect(dmg?.browser_download_url ?? RELEASES_URL, 302);
+}
+
+/** Version numbers for the download buttons, cached for five minutes. */
+async function releasesResponse(): Promise<Response> {
+  const releases = await recentReleases();
+  if (!releases) return Response.json({ release: null, nightly: null }, { status: 502 });
+  const { release, nightly } = pickReleases(releases);
+  return Response.json(
+    {
+      release: release ? { version: versionLabel(release.tag_name) } : null,
+      nightly:
+        nightly && nightly !== release
+          ? { version: versionLabel(nightly.tag_name) }
+          : null,
+    },
+    { headers: { "Cache-Control": "public, max-age=300" } },
+  );
 }
 
 async function latestDmgResponse(request: Request): Promise<Response> {
@@ -148,6 +215,14 @@ const worker = {
 
     if (url.pathname === "/download") {
       return latestDmgResponse(request);
+    }
+
+    if (url.pathname === "/download/nightly") {
+      return nightlyDmgResponse(request);
+    }
+
+    if (url.pathname === "/api/releases") {
+      return releasesResponse();
     }
 
     if (url.pathname === "/updates/appcast.xml") {

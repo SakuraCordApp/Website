@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Reuse the original local priority SVGs. */
-
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -24,6 +22,7 @@ import { ItemDialog } from "./item-dialog";
 import ItemNotFound from "./items/[id]/not-found";
 import { useTrackerNavigation } from "./use-tracker-navigation";
 import { useTrackerSnapshot } from "./use-tracker-snapshot";
+import { Morph, SFSymbol } from "../symbol";
 
 const SHIPPED_WINDOW_DAYS = 60;
 
@@ -51,6 +50,8 @@ const SORTS = {
   updated: (a: TrackerIssue, b: TrackerIssue) =>
     b.updatedAt.localeCompare(a.updatedAt),
 };
+
+const LANE_PREVIEW = 5;
 
 export function TrackerWorkspace({
   snapshot,
@@ -102,6 +103,9 @@ export function TrackerWorkspace({
   const closedStatus = meta.statuses.find(
     (option) => option.id === status && !option.open,
   );
+  // Categories fold away and long lanes show a preview, so the board stays short.
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
+  const [openLanes, setOpenLanes] = useState<Record<string, boolean>>({});
   const [shippedCutoff] = useState(
     () => Date.now() - SHIPPED_WINDOW_DAYS * 86_400_000,
   );
@@ -175,13 +179,13 @@ export function TrackerWorkspace({
         </div>
         <div className="community-heading-actions">
           <Link className="community-button" href="/report?type=bug">
-            Report a bug
+            <Morph icon="ladybug.fill">Report a bug</Morph>
           </Link>
           <Link
             className="community-button is-secondary"
             href="/report?type=feature"
           >
-            Suggest a feature
+            <Morph icon="lightbulb.fill">Suggest a feature</Morph>
           </Link>
         </div>
       </header>
@@ -191,7 +195,8 @@ export function TrackerWorkspace({
         onSubmit={(event) => event.preventDefault()}
       >
         <label className="tracker-search">
-          <span>Search</span>
+          <span className="sr-only">Search</span>
+          <SFSymbol name="magnifyingglass" />
           <input
             type="search"
             name="search"
@@ -202,7 +207,7 @@ export function TrackerWorkspace({
           />
         </label>
         <label>
-          <span>Type</span>
+          <span className="sr-only">Type</span>
           <select
             value={kind}
             onChange={(event) => updateFilter("kind", event.target.value)}
@@ -216,7 +221,7 @@ export function TrackerWorkspace({
           </select>
         </label>
         <label>
-          <span>Area</span>
+          <span className="sr-only">Area</span>
           <select
             value={area}
             onChange={(event) => updateFilter("area", event.target.value)}
@@ -230,7 +235,7 @@ export function TrackerWorkspace({
           </select>
         </label>
         <label>
-          <span>Priority</span>
+          <span className="sr-only">Priority</span>
           <select
             value={priority}
             onChange={(event) => updateFilter("priority", event.target.value)}
@@ -244,7 +249,7 @@ export function TrackerWorkspace({
           </select>
         </label>
         <label>
-          <span>Status</span>
+          <span className="sr-only">Status</span>
           <select
             value={status}
             onChange={(event) => updateFilter("status", event.target.value)}
@@ -258,7 +263,7 @@ export function TrackerWorkspace({
           </select>
         </label>
         <label>
-          <span>Sort</span>
+          <span className="sr-only">Sort</span>
           <select
             value={sort}
             onChange={(event) => updateFilter("sort", event.target.value)}
@@ -290,9 +295,29 @@ export function TrackerWorkspace({
               aria-labelledby={`category-${type.id}`}
             >
               <h2 id={`category-${type.id}`}>
-                {type.plural}
+                <button
+                  type="button"
+                  className="tracker-fold"
+                  aria-expanded={!folded[type.id]}
+                  aria-controls={`board-${type.id}`}
+                  onClick={() =>
+                    setFolded((current) => ({
+                      ...current,
+                      [type.id]: !current[type.id],
+                    }))
+                  }
+                >
+                  {type.plural}
+                  <SFSymbol name="chevron.down" className="tracker-fold-chevron" />
+                </button>
                 <span>{group.length}</span>
               </h2>
+              <div
+                className="tracker-collapse"
+                id={`board-${type.id}`}
+                data-open={!folded[type.id]}
+                inert={folded[type.id] || undefined}
+              >
               <div
                 className="tracker-columns"
                 style={{ "--columns": columns.length } as CSSProperties}
@@ -304,6 +329,46 @@ export function TrackerWorkspace({
                   const color = meta.statuses.find(
                     (option) => option.id === column.statuses[0],
                   )?.color;
+                  const renderCard = (issue: (typeof lane)[number]) => (
+
+                          <a
+                            className="tracker-card"
+                            key={issue.number}
+                            href={`/tracker/items/${issue.number}${query ? `?${query}` : ""}`}
+                            onClick={openItem}
+                            aria-label={`#${issue.number} ${issue.title}, ${statusLabel(meta, issue.status, issue.kind)}, ${issue.votes} votes`}
+                          >
+                            <span
+                              className={`priority-marker priority-${issue.priority ?? "medium"}`}
+                              aria-hidden="true"
+                            />
+                            <span>
+                              {issue.title}
+                              <small className="tracker-card-meta">
+                                #{issue.number}
+                                {issue.votes ? (
+                                  <>
+                                    {" · "}
+                                    <SFSymbol name="hand.thumbsup.fill" className="sf-inline" />{" "}
+                                    {issue.votes}
+                                  </>
+                                ) : null}
+                                {issue.status === "in_nightly"
+                                  ? " · In nightly"
+                                  : ""}
+                                {issue.status === "needs_info"
+                                  ? " · Needs info"
+                                  : ""}
+                                {issue.milestone && column.id !== "shipped"
+                                  ? ` · v${issue.milestone}`
+                                  : ""}
+                                {issue.shippedIn && column.id === "shipped"
+                                  ? ` · ${issue.shippedIn}`
+                                  : ""}
+                              </small>
+                            </span>
+                          </a>
+                  );
                   return (
                     <section
                       className="tracker-column"
@@ -320,43 +385,38 @@ export function TrackerWorkspace({
                         <span className="column-count">{lane.length}</span>
                       </h3>
                       <div className="tracker-lane-items">
-                        {lane.map((issue) => (
-                          <a
-                            className="tracker-card"
-                            key={issue.number}
-                            href={`/tracker/items/${issue.number}${query ? `?${query}` : ""}`}
-                            onClick={openItem}
-                            aria-label={`#${issue.number} ${issue.title}, ${statusLabel(meta, issue.status, issue.kind)}, ${issue.votes} votes`}
-                          >
-                            <img
-                              className="tracker-priority-icon"
-                              src={`/brand/priority/${issue.priority ?? "medium"}.svg`}
-                              width={64}
-                              height={64}
-                              loading="lazy"
-                              alt=""
-                            />
-                            <span>
-                              {issue.title}
-                              <small className="tracker-card-meta">
-                                #{issue.number}
-                                {issue.votes ? ` · 👍 ${issue.votes}` : ""}
-                                {issue.status === "in_nightly"
-                                  ? " · In nightly"
-                                  : ""}
-                                {issue.status === "needs_info"
-                                  ? " · Needs info"
-                                  : ""}
-                                {issue.milestone && column.id !== "shipped"
-                                  ? ` · v${issue.milestone}`
-                                  : ""}
-                                {issue.shippedIn && column.id === "shipped"
-                                  ? ` · ${issue.shippedIn}`
-                                  : ""}
-                              </small>
-                            </span>
-                          </a>
-                        ))}
+                        {lane.slice(0, LANE_PREVIEW).map(renderCard)}
+                        {lane.length > LANE_PREVIEW ? (
+                          <>
+                            <div
+                              className="tracker-collapse"
+                              id={`lane-${type.id}-${column.id}`}
+                              data-open={Boolean(openLanes[`${type.id}-${column.id}`])}
+                              inert={!openLanes[`${type.id}-${column.id}`] || undefined}
+                            >
+                              <div className="tracker-lane-more">
+                                {lane.slice(LANE_PREVIEW).map(renderCard)}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="tracker-lane-toggle"
+                              aria-expanded={Boolean(openLanes[`${type.id}-${column.id}`])}
+                              aria-controls={`lane-${type.id}-${column.id}`}
+                              onClick={() =>
+                                setOpenLanes((current) => ({
+                                  ...current,
+                                  [`${type.id}-${column.id}`]: !current[`${type.id}-${column.id}`],
+                                }))
+                              }
+                            >
+                              {openLanes[`${type.id}-${column.id}`]
+                                ? "Show less"
+                                : `Show ${lane.length - LANE_PREVIEW} more`}
+                              <SFSymbol name="chevron.down" className="tracker-fold-chevron" />
+                            </button>
+                          </>
+                        ) : null}
                         {!lane.length ? (
                           <p className="tracker-empty-lane">Nothing here.</p>
                         ) : null}
@@ -364,6 +424,7 @@ export function TrackerWorkspace({
                     </section>
                   );
                 })}
+              </div>
               </div>
             </section>
           );

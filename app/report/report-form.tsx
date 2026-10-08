@@ -13,6 +13,7 @@ import type {
   SessionUser,
   SimilarReport,
 } from "../lib/roadmap-types";
+import { Morph, SFSymbol } from "../symbol";
 
 const DRAFT_KEY = "sakuracord-report-draft";
 const normalizeVersion = (value: string) =>
@@ -192,14 +193,14 @@ export function ReportForm() {
         <div className="report-links">
           {outcome.report.threadUrl ? (
             <a className="community-button" href={outcome.report.threadUrl}>
-              Open the Discord post
+              <Morph icon="bubble.left.and.bubble.right.fill">Open the Discord post</Morph>
             </a>
           ) : null}
           <Link
             className="community-button is-secondary"
             href={`/tracker/items/${outcome.report.number}`}
           >
-            View on the tracker
+            <Morph icon="list.bullet">View on the tracker</Morph>
           </Link>
           <a className="community-text-link" href={outcome.report.issueUrl}>
             GitHub issue ↗
@@ -245,7 +246,8 @@ export function ReportForm() {
             className={kind === option ? "is-selected" : ""}
             onClick={() => setKind(option)}
           >
-            {option === "bug" ? "🐞 Bug" : "✨ Feature"}
+            <SFSymbol name={option === "bug" ? "ladybug.fill" : "lightbulb.fill"} />
+            {option === "bug" ? "Bug" : "Feature"}
           </button>
         ))}
       </div>
@@ -273,24 +275,26 @@ export function ReportForm() {
         )}
       </div>
 
-      <label className="report-field">
-        <span>Title</span>
-        <input
-          value={values.title ?? ""}
-          onChange={(event) => update("title", event.target.value)}
-          required
-          minLength={4}
-          maxLength={100}
-          placeholder={definition.titlePlaceholder}
-        />
-      </label>
-
       {pages.map((page) => (
         <fieldset key={page} className="report-page">
           {page === 2 ? (
             <legend>
               {definition.detailsLabel} <small>optional</small>
             </legend>
+          ) : null}
+          {/* The title opens the first card, with the fields it introduces. */}
+          {page === 1 ? (
+            <label className="report-field">
+              <span>Title</span>
+              <input
+                value={values.title ?? ""}
+                onChange={(event) => update("title", event.target.value)}
+                required
+                minLength={4}
+                maxLength={100}
+                placeholder={definition.titlePlaceholder}
+              />
+            </label>
           ) : null}
           {definition.fields
             .filter((field) => field.page === page)
@@ -326,7 +330,13 @@ export function ReportForm() {
                       </a>
                       <small>
                         {report.statusLabel}
-                        {report.votes ? ` · 👍 ${report.votes}` : ""}
+                        {report.votes ? (
+                          <>
+                            {" · "}
+                            <SFSymbol name="hand.thumbsup.fill" className="sf-inline" />{" "}
+                            {report.votes}
+                          </>
+                        ) : null}
                         {report.resolution ? ` · ${report.resolution}` : ""}
                       </small>
                     </div>
@@ -337,7 +347,7 @@ export function ReportForm() {
                         disabled={busy}
                         onClick={() => meToo(report.number)}
                       >
-                        That&apos;s my issue
+                        <Morph icon="hand.thumbsup.fill">That&apos;s my issue</Morph>
                       </button>
                     ) : null}
                   </li>
