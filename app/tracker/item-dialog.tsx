@@ -15,6 +15,7 @@ import type {
   TrackerIssue,
 } from "../lib/roadmap-types";
 import { statusLabel, useTracker } from "./tracker-context";
+import { Morph, SFSymbol } from "../symbol";
 
 export function TrackerDialog({
   title,
@@ -90,13 +91,16 @@ async function loadDetail(number: number): Promise<IssueDetail> {
 
 function useDetail(number: number) {
   const { details } = useTracker();
-  const [detail, setDetail] = useState<IssueDetail | null>(
-    () => details.current.get(number) ?? null,
-  );
+  // Start empty on the server and in the browser alike. The item page seeds the cache while it
+  // streams, after the server has already rendered this dialog, so reading it during render
+  // made the browser's first render differ from the server's and broke hydration.
+  const [detail, setDetail] = useState<IssueDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    const cached = details.current.get(number);
+    if (cached) queueMicrotask(() => !cancelled && setDetail(cached));
     loadDetail(number).then(
       (next) => {
         if (cancelled) return;
@@ -150,6 +154,16 @@ const SOURCE_LABEL: Record<string, string> = {
   website: "sakuracord.app",
 };
 
+// SF Symbols for each tracker area, in place of the hub's emoji.
+const AREA_SYMBOLS: Record<string, string> = {
+  chat: "bubble.left.fill",
+  communication: "phone.fill",
+  servers: "person.3.fill",
+  personalization: "paintpalette.fill",
+  plugins: "puzzlepiece.extension.fill",
+  platform: "laptopcomputer",
+};
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
@@ -175,7 +189,7 @@ function TimelineItem({ entry, kind }: { entry: TimelineEntry; kind: string }) {
           />
         ) : (
           <span className="timeline-avatar is-empty" aria-hidden="true">
-            {data.agent ? "🔎" : String(data.author ?? "?").slice(0, 1)}
+            {data.agent ? <SFSymbol name="magnifyingglass" /> : String(data.author ?? "?").slice(0, 1)}
           </span>
         )}
         <div>
@@ -304,13 +318,17 @@ export function ItemDialog({ issue }: { issue: TrackerIssue }) {
           <div>
             <dt>Area</dt>
             <dd>
-              {area.emoji} {area.label}
+              <SFSymbol name={AREA_SYMBOLS[area.id] ?? "square.grid.2x2.fill"} className="sf-inline" />
+              {area.label}
             </dd>
           </div>
         ) : null}
         <div>
           <dt>Votes</dt>
-          <dd>👍 {detail?.votes ?? issue.votes}</dd>
+          <dd>
+            <SFSymbol name="hand.thumbsup.fill" className="sf-inline" />
+            {detail?.votes ?? issue.votes}
+          </dd>
         </div>
         {issue.milestone ? (
           <div>
@@ -336,15 +354,15 @@ export function ItemDialog({ issue }: { issue: TrackerIssue }) {
                 post(
                   "/api/report/me-too",
                   { number: issue.number },
-                  "👍 You're following this report and will be pinged in Discord when it ships.",
+                  "You're following this report and will be pinged in Discord when it ships.",
                 )
               }
             >
-              👍 Me too
+              <Morph icon="hand.thumbsup.fill">Me too</Morph>
             </button>
           ) : session?.signInAvailable ? (
             <a className="community-button" href={signInHref}>
-              Sign in with Discord to vote or comment
+              <Morph icon="person.crop.circle.fill">Sign in with Discord to vote or comment</Morph>
             </a>
           ) : null}
           <span role="status" className="item-action-status">

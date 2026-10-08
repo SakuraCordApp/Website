@@ -38,8 +38,8 @@ test("server-renders the SakuraCord landing page", async () => {
   const html = await response.text();
   assert.match(html, /<title>SakuraCord - Native Discord for macOS<\/title>/);
   assert.match(html, /<h1[^>]*>SakuraCord<\/h1>/);
-  assert.match(html, /Download Alpha/);
-  assert.match(html, /macOS 27\+/);
+  assert.match(html, /Download for Mac/);
+  assert.match(html, /macOS 27 or later/);
   assert.match(html, /download-button-platform/);
   assert.doesNotMatch(html, /class="compatibility"/);
   assert.match(html, /full voice and video support/);
@@ -57,7 +57,7 @@ test("server-renders the SakuraCord landing page", async () => {
   );
   assert.match(
     html,
-    /property="og:image" content="https:\/\/sakuracord\.app\/discord-preview-macbook-20260821\.png"/,
+    /property="og:image" content="https:\/\/sakuracord\.app\/discord-preview-macbook-20261008\.png"/,
   );
   assert.match(html, /name="theme-color" content="#ef9bc4"/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
@@ -152,6 +152,80 @@ test("redirects downloads to the latest versioned DMG", async (t) => {
   assert.equal(response.headers.get("location"), dmgUrl);
 });
 
+test("redirects nightly downloads to the newest prerelease DMG", async (t) => {
+  const asset = (tag, name) => ({
+    name,
+    browser_download_url: `https://github.com/SakuraCordApp/SakuraCord/releases/download/${tag}/${name}`,
+  });
+  const releases = [
+    { tag_name: "v0.2.0-Beta-2", draft: true, prerelease: true, assets: [asset("v0.2.0-Beta-2", "SakuraCord-v0.2.0-Beta-2.dmg")] },
+    { tag_name: "v0.2.0-Beta-1", prerelease: true, assets: [asset("v0.2.0-Beta-1", "appcast.xml"), asset("v0.2.0-Beta-1", "SakuraCord-v0.2.0-Beta-1.dmg")] },
+    { tag_name: "v0.1.9", prerelease: false, assets: [asset("v0.1.9", "SakuraCord.v0.1.9.dmg")] },
+  ];
+
+  t.mock.method(globalThis, "fetch", async (input, init) => {
+    assert.equal(
+      input,
+      "https://api.github.com/repos/SakuraCordApp/SakuraCord/releases?per_page=20",
+    );
+    assert.equal(init.headers["User-Agent"], "SakuraCord-Website");
+    return Response.json(releases);
+  });
+
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("nightly-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const context = { waitUntil() {}, passThroughOnException() {} };
+
+  const download = await worker.fetch(new Request("http://localhost/download/nightly"), {}, context);
+  assert.equal(download.status, 302);
+  assert.equal(
+    download.headers.get("location"),
+    releases[1].assets[1].browser_download_url,
+  );
+
+  const info = await worker.fetch(new Request("http://localhost/api/releases"), {}, context);
+  assert.deepEqual(await info.json(), {
+    release: { version: "0.1.9" },
+    nightly: { version: "0.2.0 Beta 1" },
+  });
+});
+
+test("lists releases and renders their notes", async (t) => {
+  t.mock.method(globalThis, "fetch", async (input) => {
+    assert.match(String(input), /api\.github\.com\/repos\/SakuraCordApp\/SakuraCord\/releases/);
+    return Response.json([
+      { tag_name: "v0.2.0-Beta-1", name: "", draft: true, prerelease: true, published_at: null, html_url: "", body: "Draft" },
+      {
+        tag_name: "v0.1.9",
+        name: "SakuraCord v0.1.9",
+        draft: false,
+        prerelease: false,
+        published_at: "2026-09-01T00:00:00Z",
+        html_url: "https://github.com/SakuraCordApp/SakuraCord/releases/tag/v0.1.9",
+        body: "Calls feel faster.\n\n## Calls\n\n- Added **noise suppression** with `/mute`.\n\n<!-- marker -->",
+        assets: [{ name: "SakuraCord.v0.1.9.dmg", browser_download_url: "https://example.com/v0.1.9.dmg" }],
+      },
+    ]);
+  });
+
+  const list = await render("/releases");
+  assert.equal(list.status, 200);
+  const listHtml = await list.text();
+  assert.match(listHtml, /SakuraCord 0\.1\.9/);
+  assert.match(listHtml, /Calls feel faster\./);
+  assert.match(listHtml, /href="https:\/\/example\.com\/v0\.1\.9\.dmg"/);
+  assert.doesNotMatch(listHtml, /0\.2\.0 Beta 1/);
+
+  const notes = await render("/releases/v0.1.9");
+  assert.equal(notes.status, 200);
+  const notesHtml = await notes.text();
+  assert.match(notesHtml, /<h2>Calls<\/h2>/);
+  assert.match(notesHtml, /<strong>noise suppression<\/strong>/);
+  assert.match(notesHtml, /<code>\/mute<\/code>/);
+  assert.doesNotMatch(notesHtml, /marker/);
+});
+
 test("keeps the landing page accessible and resilient", async () => {
   const [page, css, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -162,21 +236,19 @@ test("keeps the landing page accessible and resilient", async () => {
 
   assert.match(layout, /className="skip-link"/);
   assert.match(page, /aria-labelledby="hero-title"/);
-  assert.match(page, /className="benefit-list"/);
-  assert.match(page, /Discord, built as a Mac app\./);
   assert.match(page, /Join the community\./);
-  assert.match(page, /There is no Chromium bundle behind the interface/);
+  assert.match(page, /no Chromium bundle/);
   assert.match(page, /className="discord-mark"/);
   assert.doesNotMatch(page, /DiscordLogoIcon/);
   assert.match(
     css,
-    /\.hero-actions \.button,\s*\.download-copy \.button\s*\{\s*width: 100%;/,
+    /\.hero-actions \.pill\s*\{\s*width: 100%;/,
   );
   assert.match(css, /::selection\s*\{[^}]*background: var\(--pink-light\)/s);
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce/);
-  assert.match(layout, /colorScheme:\s*"dark"/);
+  assert.match(layout, /colorScheme:\s*"light dark"/);
   assert.match(packageJson, /"name": "sakuracord-website"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
