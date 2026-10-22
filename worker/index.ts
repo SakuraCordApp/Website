@@ -5,6 +5,7 @@ import {
   DEFAULT_IMAGE_SIZES,
 } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { isLinkPreviewBot } from "../app/lib/link-preview-bots";
 import { roadmapService } from "./roadmap-context";
 import { themePreviewResponse } from "./theme-preview";
 
@@ -133,6 +134,26 @@ async function nightlyAppcastResponse(request: Request): Promise<Response> {
   });
 }
 
+// Settings deeplinks are SakuraCord's in-app links: link-preview bots get a
+// preview, and everyone else goes to the homepage. The router decodes paths
+// (/%73ettings is /settings), so match the decoded path.
+function isSettingsDeepLink(pathname: string) {
+  try {
+    pathname = decodeURIComponent(pathname);
+  } catch {
+    // Malformed escapes route as written.
+  }
+  return pathname === "/settings" || pathname.startsWith("/settings/");
+}
+
+// No cache may share a bot's preview with a person's redirect.
+function varyByUserAgent(response: Response) {
+  const varied = new Response(response.body, response);
+  varied.headers.append("Vary", "User-Agent");
+  varied.headers.set("Cache-Control", "private, no-store");
+  return varied;
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -186,6 +207,14 @@ const worker = {
       );
     }
 
+    const settingsDeepLink = isSettingsDeepLink(url.pathname);
+    if (
+      settingsDeepLink &&
+      !isLinkPreviewBot(request.headers.get("user-agent"))
+    ) {
+      return varyByUserAgent(Response.redirect(new URL("/", request.url), 307));
+    }
+
     const response = await roadmapService.run(
       {
         fetch: (input) => env.ROADMAP.fetch(input),
@@ -194,19 +223,7 @@ const worker = {
       },
       () => handler.fetch(request, env, ctx),
     );
-    // Match the router, which decodes the path (/%73ettings is /settings).
-    let pathname = url.pathname;
-    try {
-      pathname = decodeURIComponent(pathname);
-    } catch {}
-    if (!pathname.startsWith("/settings")) return response;
-
-    // Settings deeplinks show link-preview bots a preview and send everyone
-    // else to the homepage, so no cache may share one answer between them.
-    const varied = new Response(response.body, response);
-    varied.headers.append("Vary", "User-Agent");
-    varied.headers.set("Cache-Control", "private, no-store");
-    return varied;
+    return settingsDeepLink ? varyByUserAgent(response) : response;
   },
 };
 

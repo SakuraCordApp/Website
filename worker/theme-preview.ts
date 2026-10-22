@@ -6,6 +6,7 @@ import {
   renderedRGB,
   THEME_CARD,
   THEME_PREVIEW_SIZE,
+  THEME_PREVIEW_VERSION,
   themePreviewPath,
   type SharedTheme,
 } from "../app/lib/theme-link";
@@ -75,7 +76,7 @@ function renderThemePreview(theme: SharedTheme) {
     borderWidth,
     dotDiameter,
     dotStep,
-    outlineWidth,
+    dotOutlineWidth,
     buttonWidth,
     buttonHeight,
   } = THEME_CARD;
@@ -159,7 +160,7 @@ function renderThemePreview(theme: SharedTheme) {
           const dotCoverage = clamp(0.5 - dotDistance * scale);
           if (dotCoverage === 0) continue;
           const outlineCoverage =
-            OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
+            OUTLINE_OPACITY * clamp((dotDistance + dotOutlineWidth) * scale + 0.5);
           for (let channel = 0; channel < 3; channel++) {
             const fill =
               palette[dot][channel] +
@@ -251,10 +252,12 @@ export async function themePreviewResponse(
     request.method === "HEAD" ? new Response(null, response) : response;
 
   const url = new URL(request.url);
-  // URLs from earlier embeds still resolve, to the current design.
-  const token = url.pathname.match(
-    /^\/theme-preview\/v[1-6]\/([A-Za-z0-9_-]+)\.png$/,
-  )?.[1];
+  // URLs from earlier versions still resolve, to the current design.
+  const [, version, token] =
+    url.pathname.match(/^\/theme-preview\/v([1-9]\d*)\/([A-Za-z0-9_-]+)\.png$/) ?? [];
+  if (Number(version) > THEME_PREVIEW_VERSION) {
+    return new Response("Unknown theme", { status: 404 });
+  }
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;
   if (!token || !theme) return new Response("Unknown theme", { status: 404 });

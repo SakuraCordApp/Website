@@ -169,20 +169,13 @@ test("server-renders a palette embed for theme links", async () => {
 test("theme links preview only for link-preview bots and redirect people home", async () => {
   // A corrupted checksum, which SakuraCord ignores too.
   const invalidPath = `/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`;
+  const browser =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
   for (const [path, userAgent] of [
-    [
-      THEME_PATH,
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    ],
-    [
-      invalidPath,
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    ],
+    [THEME_PATH, browser],
+    [invalidPath, browser],
     // An encoded path reaches the same route and must get the same headers.
-    [
-      THEME_PATH.replace("/settings", "/%73ettings"),
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    ],
+    [THEME_PATH.replace("/settings", "/%73ettings"), browser],
     // Pinterest's in-app browser is a person, not its crawler.
     [
       THEME_PATH,

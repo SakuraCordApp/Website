@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { isLinkPreviewBot } from "../../lib/link-preview-bots";
 
 const title = "SakuraCord Settings Deeplink";
 const description =
@@ -60,11 +57,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function SettingsDeepLinkPage() {
-  if (!isLinkPreviewBot((await headers()).get("user-agent"))) {
-    redirect("/");
-  }
-
+// Only link-preview bots reach this page; the worker sends people home.
+export default function SettingsDeepLinkPage() {
   return (
     <main>
       <h1>{title}</h1>

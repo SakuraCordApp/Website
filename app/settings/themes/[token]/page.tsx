@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { cache } from "react";
-import { isLinkPreviewBot } from "../../../lib/link-preview-bots";
 import {
   decodeThemeToken,
   previewAppearance,
@@ -22,11 +20,9 @@ type ThemeLinkPageProps = {
   params: Promise<{ token: string }>;
 };
 
-// Theme links exist for link previews: people opening one in a browser go to
-// the homepage, as before. Metadata, viewport and the page all need the
-// decoded link.
-const loadThemeLink = cache(async (token: string) => {
-  if (!isLinkPreviewBot((await headers()).get("user-agent"))) redirect("/");
+// Only link-preview bots reach this page; the worker sends people home.
+// Metadata, viewport and the page all need the decoded link.
+const loadThemeLink = cache((token: string) => {
   const decoded = decodeThemeToken(token);
   if (!decoded) notFound();
   const theme = decoded.kind === "current" ? decoded.theme : decoded.preview;
@@ -47,7 +43,7 @@ function componentEmbed({
   theme,
   name,
   accent,
-}: Awaited<ReturnType<typeof loadThemeLink>>) {
+}: ReturnType<typeof loadThemeLink>) {
   return {
     component: {
       type: 17,
@@ -82,7 +78,7 @@ function componentEmbed({
 export async function generateMetadata({
   params,
 }: ThemeLinkPageProps): Promise<Metadata> {
-  const { token, theme, name } = await loadThemeLink((await params).token);
+  const { token, theme, name } = loadThemeLink((await params).token);
   const title = `${name} · SakuraCord`;
   const image = theme
     ? {
@@ -117,12 +113,12 @@ export async function generateMetadata({
 export async function generateViewport({
   params,
 }: ThemeLinkPageProps): Promise<Viewport> {
-  const { accent } = await loadThemeLink((await params).token);
+  const { accent } = loadThemeLink((await params).token);
   return { themeColor: accent, colorScheme: "dark" };
 }
 
 export default async function ThemeLinkPage({ params }: ThemeLinkPageProps) {
-  const themeLink = await loadThemeLink((await params).token);
+  const themeLink = loadThemeLink((await params).token);
   return (
     <script
       id="discord:component-embed"

@@ -149,7 +149,7 @@ export const THEME_CARD = {
   borderWidth: 1,
   dotDiameter: 24,
   dotStep: 16,
-  outlineWidth: 1.6,
+  dotOutlineWidth: 1.6,
   buttonWidth: 150,
   buttonHeight: 28,
 };
@@ -159,8 +159,11 @@ export const THEME_PREVIEW_SIZE = {
   height: (THEME_CARD.height + THEME_CARD.marginY * 2) * THEME_CARD.scale,
 };
 
+// Bump when the artwork changes: previews are cached as immutable.
+export const THEME_PREVIEW_VERSION = 6;
+
 export function themePreviewPath(token: string) {
-  return `/theme-preview/v6/${token}.png`;
+  return `/theme-preview/v${THEME_PREVIEW_VERSION}/${token}.png`;
 }
 
 export function activeColors(theme: SharedTheme): ThemeColor[] {
