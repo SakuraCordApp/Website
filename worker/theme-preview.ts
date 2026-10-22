@@ -1,5 +1,6 @@
 import {
   activeColors,
+  clamp,
   decodeThemeToken,
   previewAppearance,
   renderedRGB,
@@ -13,52 +14,34 @@ const CONTROL_BACKGROUND = {
   dark: [30 / 255, 30 / 255, 30 / 255],
   light: [1, 1, 1],
 };
+// sakuraCordDeepLinkCard: the surface covers the gradient at 94% inside a 1pt
+// border, dot outlines are 92%, and the glow is a 13pt NSShadow of 28% accent
+// cast by the card's 20% accent fill.
+const SURFACE_OPACITY = 0.94;
+const OUTLINE_OPACITY = 0.92;
+const BORDER_WIDTH = 1;
+const GLOW_SIGMA = 13 / 2; // NSShadow's blur radius spans about two sigma.
+const GLOW_OPACITY = 0.28 * 0.2;
 
-const clampUnit = (value: number) => Math.min(Math.max(value, 0), 1);
-
-// Signed distance from a point to a rounded rectangle.
-function roundedRectDistance(
-  x: number,
-  y: number,
-  left: number,
-  top: number,
-  right: number,
-  bottom: number,
-  radius: number,
-) {
-  const qx = Math.abs(x - (left + right) / 2) - ((right - left) / 2 - radius);
-  const qy = Math.abs(y - (top + bottom) / 2) - ((bottom - top) / 2 - radius);
-  return (
-    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) +
-    Math.min(Math.max(qx, qy), 0) -
-    radius
-  );
-}
-
-// Complementary error function (Abramowitz–Stegun 7.1.26), for the glow.
+// Complementary error function for non-negative values
+// (Abramowitz–Stegun 7.1.26), for the glow falloff.
 function erfc(value: number) {
-  const t = 1 / (1 + 0.3275911 * Math.abs(value));
-  const tail =
+  const t = 1 / (1 + 0.3275911 * value);
+  return (
     t *
     (0.254829592 +
       t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) *
-    Math.exp(-value * value);
-  return value >= 0 ? tail : 2 - tail;
+    Math.exp(-value * value)
+  );
 }
 
 // Draws the in-chat theme link card's palette: overlapping dots on the card
 // surface, with its gradient border and accent glow, on a transparent canvas.
-// Returns straight (non-premultiplied) RGBA.
-export function renderThemePreview(theme: SharedTheme): Uint8Array {
-  const {
-    scale,
-    padding,
-    cornerRadius,
-    dotDiameter,
-    dotStep,
-    outlineWidth,
-    glowMargin,
-  } = THEME_CARD;
+// Returns straight (non-premultiplied) RGBA. The pixel loop stays
+// allocation-free; per-column and per-row terms are hoisted out of it.
+function renderThemePreview(theme: SharedTheme) {
+  const { scale, padding, cornerRadius, dotDiameter, dotStep, outlineWidth, glowMargin } =
+    THEME_CARD;
   const { width, height } = themePreviewSize(theme);
   const appearance = previewAppearance(theme);
   const palette = activeColors(theme).map((color) => {
@@ -72,95 +55,100 @@ export function renderThemePreview(theme: SharedTheme): Uint8Array {
   const cardTop = glowMargin;
   const cardRight = width / scale - glowMargin;
   const cardBottom = height / scale - glowMargin;
+  const centerX = (cardLeft + cardRight) / 2;
+  const centerY = (cardTop + cardBottom) / 2;
+  const straightHalfWidth = (cardRight - cardLeft) / 2 - cornerRadius;
+  const straightHalfHeight = (cardBottom - cardTop) / 2 - cornerRadius;
   const dotRadius = dotDiameter / 2;
-  const dotY = (cardTop + cardBottom) / 2;
-  const firstDotX = cardLeft + padding + dotRadius;
-  // NSShadow's blur radius is roughly two standard deviations. The shadow
-  // comes from the card's 20% accent fill, tinted with 28% accent.
-  const glowSigma = 13 / 2;
-  const glowAlpha = 0.28 * 0.2;
+  const dotReach = dotRadius + 1 / scale;
+  const dotX = palette.map(
+    (_, index) => cardLeft + padding + dotRadius + index * dotStep,
+  );
+
+  // NSGradient(colors:) at angle 0 spans the card's bounds, so the border
+  // colour depends only on the column.
+  const border = new Float64Array(width * 3);
+  for (let x = 0; x < width; x++) {
+    const position =
+      clamp(((x + 0.5) / scale - cardLeft) / (cardRight - cardLeft)) *
+      (palette.length - 1);
+    const index = Math.min(Math.floor(position), Math.max(palette.length - 2, 0));
+    const next = Math.min(index + 1, palette.length - 1);
+    for (let channel = 0; channel < 3; channel++) {
+      border[x * 3 + channel] =
+        palette[index][channel] +
+        (palette[next][channel] - palette[index][channel]) * (position - index);
+    }
+  }
 
   const pixels = new Uint8Array(width * height * 4);
-  const card = [0, 0, 0];
+  const color = new Float64Array(3);
   for (let y = 0; y < height; y++) {
     const pointY = (y + 0.5) / scale;
+    const qy = Math.abs(pointY - centerY) - straightHalfHeight;
+    const dotOffsetY = pointY - centerY;
+    const inDotRows = Math.abs(dotOffsetY) < dotReach;
     for (let x = 0; x < width; x++) {
       const pointX = (x + 0.5) / scale;
-      const cardDistance = roundedRectDistance(
-        pointX, pointY, cardLeft, cardTop, cardRight, cardBottom, cornerRadius,
-      );
-      const cardCoverage = clampUnit(0.5 - cardDistance * scale);
+      // Signed distance to the card's rounded rectangle.
+      const qx = Math.abs(pointX - centerX) - straightHalfWidth;
+      const cardDistance =
+        Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) +
+        Math.min(Math.max(qx, qy), 0) -
+        cornerRadius;
+      const cardCoverage = clamp(0.5 - cardDistance * scale);
       const glow =
-        glowAlpha * 0.5 * erfc(Math.max(cardDistance, 0) / (glowSigma * Math.SQRT2));
-      let red = accent[0] * glow;
-      let green = accent[1] * glow;
-      let blue = accent[2] * glow;
+        cardCoverage < 1
+          ? GLOW_OPACITY *
+            0.5 *
+            erfc(Math.max(cardDistance, 0) / (GLOW_SIGMA * Math.SQRT2))
+          : 0;
       let alpha = glow;
+      for (let channel = 0; channel < 3; channel++) {
+        color[channel] = accent[channel] * glow;
+      }
 
       if (cardCoverage > 0) {
-        // NSGradient(colors:) at angle 0 spans the card's bounds.
-        const position =
-          clampUnit((pointX - cardLeft) / (cardRight - cardLeft)) *
-          (palette.length - 1);
-        const index = Math.min(Math.floor(position), Math.max(palette.length - 2, 0));
-        const next = Math.min(index + 1, palette.length - 1);
-        const fraction = position - index;
-        // The surface covers the gradient at 94%, inset by the 1pt border.
-        const innerCoverage =
-          0.94 *
-          clampUnit(
-            0.5 -
-              roundedRectDistance(
-                pointX,
-                pointY,
-                cardLeft + 1,
-                cardTop + 1,
-                cardRight - 1,
-                cardBottom - 1,
-                cornerRadius - 1,
-              ) *
-                scale,
-          );
+        // The inner surface is the card inset by the border, so its distance
+        // is the card's plus the border width.
+        const surfaceCoverage =
+          SURFACE_OPACITY *
+          clamp(0.5 - (cardDistance + BORDER_WIDTH) * scale);
         for (let channel = 0; channel < 3; channel++) {
-          const border =
-            palette[index][channel] +
-            (palette[next][channel] - palette[index][channel]) * fraction;
-          card[channel] = border + (surface[channel] - border) * innerCoverage;
+          const edge = border[x * 3 + channel];
+          const card = edge + (surface[channel] - edge) * surfaceCoverage;
+          color[channel] = card * cardCoverage + color[channel] * (1 - cardCoverage);
         }
 
-        for (let dot = 0; dot < palette.length; dot++) {
+        for (let dot = 0; inDotRows && dot < palette.length; dot++) {
+          if (Math.abs(pointX - dotX[dot]) >= dotReach) continue;
           const dotDistance =
-            Math.hypot(pointX - (firstDotX + dot * dotStep), pointY - dotY) -
-            dotRadius;
-          const dotCoverage = clampUnit(0.5 - dotDistance * scale);
+            Math.hypot(pointX - dotX[dot], dotOffsetY) - dotRadius;
+          const dotCoverage = clamp(0.5 - dotDistance * scale) * cardCoverage;
           if (dotCoverage === 0) continue;
           // A 1pt outline stroked just inside the dot's edge.
           const outlineCoverage =
-            0.92 * clampUnit((dotDistance + outlineWidth) * scale + 0.5);
+            OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
           for (let channel = 0; channel < 3; channel++) {
             const fill =
               palette[dot][channel] +
               (surface[channel] - palette[dot][channel]) * outlineCoverage;
-            card[channel] += (fill - card[channel]) * dotCoverage;
+            color[channel] += (fill - color[channel]) * dotCoverage;
           }
         }
-
-        red = card[0] * cardCoverage + red * (1 - cardCoverage);
-        green = card[1] * cardCoverage + green * (1 - cardCoverage);
-        blue = card[2] * cardCoverage + blue * (1 - cardCoverage);
         alpha = cardCoverage + alpha * (1 - cardCoverage);
       }
 
       const offset = (y * width + x) * 4;
       if (alpha > 0) {
-        pixels[offset] = Math.round(clampUnit(red / alpha) * 255);
-        pixels[offset + 1] = Math.round(clampUnit(green / alpha) * 255);
-        pixels[offset + 2] = Math.round(clampUnit(blue / alpha) * 255);
+        for (let channel = 0; channel < 3; channel++) {
+          pixels[offset + channel] = Math.round(clamp(color[channel] / alpha) * 255);
+        }
       }
       pixels[offset + 3] = Math.round(alpha * 255);
     }
   }
-  return pixels;
+  return { width, height, pixels };
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
@@ -187,11 +175,11 @@ function pngChunk(type: string, data: Uint8Array) {
   return chunk;
 }
 
-export async function encodePNG(
-  width: number,
-  height: number,
-  rgba: Uint8Array,
-): Promise<Uint8Array<ArrayBuffer>> {
+async function encodePNG({
+  width,
+  height,
+  pixels,
+}: ReturnType<typeof renderThemePreview>) {
   const stride = width * 4;
   const scanlines = new Uint8Array((stride + 1) * height);
   for (let y = 0; y < height; y++) {
@@ -199,7 +187,7 @@ export async function encodePNG(
     scanlines[row] = 1; // Sub filter: smooth gradients compress well.
     for (let x = 0; x < stride; x++) {
       const index = y * stride + x;
-      scanlines[row + 1 + x] = rgba[index] - (x >= 4 ? rgba[index - 4] : 0);
+      scanlines[row + 1 + x] = pixels[index] - (x >= 4 ? pixels[index - 4] : 0);
     }
   }
   const compressed = new Uint8Array(
@@ -213,23 +201,17 @@ export async function encodePNG(
   headerView.setUint32(4, height);
   header.set([8, 6, 0, 0, 0], 8); // 8-bit RGBA, no interlace.
 
-  const parts = [
+  return new Blob([
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     pngChunk("IHDR", header),
     pngChunk("IDAT", compressed),
     pngChunk("IEND", new Uint8Array()),
-  ];
-  const png = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    png.set(part, offset);
-    offset += part.length;
-  }
-  return png;
+  ]).arrayBuffer();
 }
 
 export async function themePreviewResponse(
   request: Request,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", {
@@ -237,18 +219,10 @@ export async function themePreviewResponse(
       headers: { Allow: "GET, HEAD" },
     });
   }
+  const reply = (response: Response) =>
+    request.method === "HEAD" ? new Response(null, response) : response;
 
   const url = new URL(request.url);
-  // Key on the path alone so query strings can't force fresh renders.
-  const cacheKey = new Request(`${url.origin}${url.pathname}`);
-  // Workers' default cache; absent when the tests run the worker in Node.
-  const cache =
-    typeof caches === "undefined"
-      ? undefined
-      : (caches as CacheStorage & { default: Cache }).default;
-  const cached = await cache?.match(cacheKey);
-  if (cached) return request.method === "HEAD" ? new Response(null, cached) : cached;
-
   const token = url.pathname.match(
     /^\/theme-preview\/v1\/([A-Za-z0-9_-]+)\.png$/,
   )?.[1];
@@ -256,16 +230,21 @@ export async function themePreviewResponse(
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;
   if (!theme) return new Response("Unknown theme", { status: 404 });
 
-  const { width, height } = themePreviewSize(theme);
-  const png = await encodePNG(width, height, renderThemePreview(theme));
-  const response = new Response(png, {
+  // Key on the path alone so query strings can't force fresh renders.
+  const cacheKey = new Request(`${url.origin}${url.pathname}`);
+  const cache = (caches as CacheStorage & { default: Cache }).default;
+  const cached = await cache.match(cacheKey);
+  if (cached) return reply(cached);
+
+  const png = await encodePNG(renderThemePreview(theme));
+  const init = {
     headers: {
       // The token is the whole theme, so a preview never changes.
       "Cache-Control": "public, max-age=31536000, immutable",
       "Content-Type": "image/png",
       "X-Content-Type-Options": "nosniff",
     },
-  });
-  await cache?.put(cacheKey, response.clone());
-  return request.method === "HEAD" ? new Response(null, response) : response;
+  };
+  ctx.waitUntil(cache.put(cacheKey, new Response(png, init)));
+  return reply(new Response(png, init));
 }

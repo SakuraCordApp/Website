@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- The preview is rendered by the worker; vinext has no runtime Next image optimizer. */
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import {
-  activeColors,
   decodeThemeToken,
   previewAppearance,
   renderedRGB,
@@ -14,13 +14,14 @@ import {
 } from "../../../lib/theme-link";
 
 const SITE_URL = "https://sakuracord.app";
+const SAKURA_PINK = "#ef9bc4";
 
 type ThemeLinkPageProps = {
   params: Promise<{ token: string }>;
 };
 
-async function loadThemeLink({ params }: ThemeLinkPageProps) {
-  const { token } = await params;
+// Metadata, viewport and the page all need the decoded link.
+const loadThemeLink = cache((token: string) => {
   const decoded = decodeThemeToken(token);
   if (!decoded) notFound();
   const theme = decoded.kind === "current" ? decoded.theme : decoded.preview;
@@ -30,16 +31,12 @@ async function loadThemeLink({ params }: ThemeLinkPageProps) {
     theme,
     name,
     description: themeDescription(theme, decoded.kind !== "current"),
-    palette: theme ? themePalette(theme) : [],
+    // The card's first palette color, as SakuraCord renders it.
+    accent: theme
+      ? rgbHex(renderedRGB(theme, theme.colors[0], previewAppearance(theme)))
+      : SAKURA_PINK,
   };
-}
-
-function themePalette(theme: SharedTheme) {
-  const appearance = previewAppearance(theme);
-  return activeColors(theme).map((color) =>
-    rgbHex(renderedRGB(theme, color, appearance)),
-  );
-}
+});
 
 function themeDescription(theme: SharedTheme | null, needsUpdate: boolean) {
   const opacity = Math.round((theme?.windowOpacity ?? 1) * 100);
@@ -56,12 +53,12 @@ function componentEmbed({
   theme,
   name,
   description,
-  palette,
-}: Awaited<ReturnType<typeof loadThemeLink>>) {
+  accent,
+}: ReturnType<typeof loadThemeLink>) {
   return {
     component: {
       type: 17,
-      accent_color: Number.parseInt((palette[0] ?? "#ef9bc4").slice(1), 16),
+      accent_color: Number.parseInt(accent.slice(1), 16),
       components: [
         { type: 10, content: `## ${name}\n${description}` },
         ...(theme
@@ -88,10 +85,12 @@ function componentEmbed({
   };
 }
 
-export async function generateMetadata(
-  props: ThemeLinkPageProps,
-): Promise<Metadata> {
-  const { token, theme, name, description } = await loadThemeLink(props);
+export async function generateMetadata({
+  params,
+}: ThemeLinkPageProps): Promise<Metadata> {
+  const { token, theme, name, description } = loadThemeLink(
+    (await params).token,
+  );
   const title = `${name} · SakuraCord`;
   const image = theme
     ? {
@@ -129,15 +128,15 @@ export async function generateMetadata(
   };
 }
 
-export async function generateViewport(
-  props: ThemeLinkPageProps,
-): Promise<Viewport> {
-  const { palette } = await loadThemeLink(props);
-  return { themeColor: palette[0] ?? "#ef9bc4", colorScheme: "dark" };
+export async function generateViewport({
+  params,
+}: ThemeLinkPageProps): Promise<Viewport> {
+  const { accent } = loadThemeLink((await params).token);
+  return { themeColor: accent, colorScheme: "dark" };
 }
 
-export default async function ThemeLinkPage(props: ThemeLinkPageProps) {
-  const themeLink = await loadThemeLink(props);
+export default async function ThemeLinkPage({ params }: ThemeLinkPageProps) {
+  const themeLink = loadThemeLink((await params).token);
   return (
     <>
       <script

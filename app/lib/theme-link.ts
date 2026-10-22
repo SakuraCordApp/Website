@@ -36,7 +36,7 @@ const MAXIMUM_COLOR_COUNT = 5;
 const DEFAULT_WINDOW_OPACITY = 1;
 const APPEARANCES: SharedThemeAppearance[] = ["system", "light", "dark"];
 
-const clamp = (value: number, lower = 0, upper = 1) =>
+export const clamp = (value: number, lower = 0, upper = 1) =>
   Math.min(Math.max(value, lower), upper);
 
 function crc16(bytes: Uint8Array): number {
@@ -168,7 +168,7 @@ export function previewAppearance(theme: SharedTheme): ThemeAppearance {
   return theme.appearance === "light" ? "light" : "dark";
 }
 
-export function hsbToRGB(
+function hsbToRGB(
   hue: number,
   saturation: number,
   brightness: number,
@@ -258,10 +258,9 @@ const HUE_NAMES: Array<[number, string]> = [
   [290, "Violet"],
   [320, "Magenta"],
   [345, "Pink"],
-  [360, "Red"],
 ];
 
-export function colorName(color: ThemeColor): string {
+function colorName(color: ThemeColor): string {
   if (color.saturation < 0.12) return "Gray";
   const degrees = color.hue * 360;
   return HUE_NAMES.find(([limit]) => degrees < limit)?.[1] ?? "Red";

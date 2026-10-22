@@ -8,6 +8,17 @@ const STALE_DOWNLOAD_URL =
 const DISCORD_URL = "https://discord.gg/hWNwFXkUTP";
 const MAIN_SITE_URL = "/";
 
+// Workers' default cache, which Node lacks.
+const cachedResponses = new Map();
+globalThis.caches ??= {
+  default: {
+    match: async (request) => cachedResponses.get(request.url)?.clone(),
+    put: async (request, response) => {
+      cachedResponses.set(request.url, response);
+    },
+  },
+};
+
 async function render(path = "/", headers = {}, service) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -69,7 +80,7 @@ test("server-renders generic Discord metadata for every settings deeplink", asyn
       "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
   };
 
-  for (const path of ["/settings", "/settings/update"]) {
+  for (const path of ["/settings", "/settings/update", "/settings/themes"]) {
     const response = await render(path, discordHeaders);
     assert.equal(response.status, 200);
 
@@ -97,7 +108,7 @@ test("server-renders generic Discord metadata for every settings deeplink", asyn
 });
 
 test("redirects every human settings request to the homepage", async () => {
-  for (const path of ["/settings", "/settings/update"]) {
+  for (const path of ["/settings", "/settings/update", "/settings/themes"]) {
     const response = await render(path);
     assert.equal(response.status, 307);
     assert.equal(response.headers.get("location"), "http://localhost/");
@@ -117,7 +128,6 @@ test("server-renders a palette embed for theme links", async () => {
   const html = await response.text();
 
   assert.match(html, /<title>Orange, Green &amp; Teal theme · SakuraCord<\/title>/);
-  assert.match(html, /property="og:image" content="([^"]+)"/);
   assert.equal(html.match(/property="og:image" content="([^"]+)"/)[1], THEME_IMAGE);
   assert.match(html, /property="og:image:width" content="664"/);
   assert.match(html, /property="og:image:height" content="504"/);

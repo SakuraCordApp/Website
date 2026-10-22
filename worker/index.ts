@@ -156,7 +156,7 @@ const worker = {
     }
 
     if (url.pathname.startsWith("/theme-preview/")) {
-      return themePreviewResponse(request);
+      return themePreviewResponse(request, ctx);
     }
 
     if (url.pathname === "/_vinext/image") {
