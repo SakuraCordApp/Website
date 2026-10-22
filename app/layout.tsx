@@ -25,7 +25,7 @@ export const metadata: Metadata = {
       "A fast native Discord client for macOS with full voice and video support.",
     images: [
       {
-        url: "/discord-preview-macbook-20260821.png",
+        url: "/discord-preview-macbook-20261008.png",
         width: 3200,
         height: 1680,
         alt: "SakuraCord running on a MacBook beneath the SakuraCord wordmark",
@@ -37,13 +37,13 @@ export const metadata: Metadata = {
     title: "SakuraCord - Discord, at home on the Mac.",
     description:
       "A fast native Discord client for macOS with full voice and video support.",
-    images: ["/discord-preview-macbook-20260821.png"],
+    images: ["/discord-preview-macbook-20261008.png"],
   },
 };
 
 export const viewport: Viewport = {
   themeColor: "#ef9bc4",
-  colorScheme: "dark",
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -52,7 +52,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the saved appearance before first paint so pages never flash the wrong one. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){var t="system";try{t=localStorage.getItem("sc-theme")||"system"}catch(e){}var r=document.documentElement;r.classList.toggle("dark",t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches));r.dataset.theme=t;r.classList.add("js")})();',
+          }}
+        />
+      </head>
       <body>
         {/* Register before the router so tracker-only history can stay local. */}
         <script

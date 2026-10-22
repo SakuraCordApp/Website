@@ -28,9 +28,13 @@ data rendering, direct tracker links, and missing-item handling.
 
 ## Discord preview image
 
-The Open Graph and Twitter preview is generated at
-`public/discord-preview-macbook-20260821.png`. Regenerate it after editing its
-source assets with:
+The Open Graph and Twitter preview is
+`public/discord-preview-macbook-20261008.png`: the app icon and name beside the
+home page's hero card, captured from the site at 3200×1680. Recapture it when
+the hero changes, under a new filename.
+
+The earlier composition, `public/discord-preview-macbook-20260821.png`, is
+rendered from its source assets with:
 
 ```bash
 npm run render:discord-preview
@@ -46,6 +50,8 @@ social-platform caches.
 ## Important links
 
 - Latest DMG: `https://sakuracord.app/download`
+- Latest nightly DMG: `https://sakuracord.app/download/nightly`
+- Current version numbers: `https://sakuracord.app/api/releases`
 - Nightly Sparkle feed: `https://sakuracord.app/updates/appcast.xml`
 - Source: `https://github.com/SakuraCordApp/SakuraCord`
 - Discord: `https://discord.gg/hWNwFXkUTP`
