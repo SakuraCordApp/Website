@@ -6,6 +6,7 @@ import {
 } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { roadmapService } from "./roadmap-context";
+import { themePreviewResponse } from "./theme-preview";
 
 const LATEST_RELEASE_API =
   "https://api.github.com/repos/SakuraCordApp/SakuraCord/releases/latest";
@@ -152,6 +153,10 @@ const worker = {
 
     if (url.pathname === "/updates/appcast.xml") {
       return nightlyAppcastResponse(request);
+    }
+
+    if (url.pathname.startsWith("/theme-preview/")) {
+      return themePreviewResponse(request);
     }
 
     if (url.pathname === "/_vinext/image") {

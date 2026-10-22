@@ -69,11 +69,7 @@ test("server-renders generic Discord metadata for every settings deeplink", asyn
       "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
   };
 
-  for (const path of [
-    "/settings",
-    "/settings/update",
-    "/settings/themes/AQGKz_VpjwzNszNAALhRczO9cKZmwo_Zmcet62c",
-  ]) {
+  for (const path of ["/settings", "/settings/update"]) {
     const response = await render(path, discordHeaders);
     assert.equal(response.status, 200);
 
@@ -101,15 +97,119 @@ test("server-renders generic Discord metadata for every settings deeplink", asyn
 });
 
 test("redirects every human settings request to the homepage", async () => {
-  for (const path of [
-    "/settings",
-    "/settings/update",
-    "/settings/themes/AQGKz_VpjwzNszNAALhRczO9cKZmwo_Zmcet62c",
-  ]) {
+  for (const path of ["/settings", "/settings/update"]) {
     const response = await render(path);
     assert.equal(response.status, 307);
     assert.equal(response.headers.get("location"), "http://localhost/");
   }
+});
+
+const THEME_TOKEN = "AQJKz_VpjwzNszNAALhRczO9cP__yjw";
+const THEME_PATH = `/settings/themes/${THEME_TOKEN}`;
+const THEME_IMAGE = `https://sakuracord.app/theme-preview/v1/${THEME_TOKEN}.png`;
+
+test("server-renders a palette embed for theme links", async () => {
+  const response = await render(THEME_PATH, {
+    "user-agent":
+      "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  assert.match(html, /<title>Orange, Green &amp; Teal theme · SakuraCord<\/title>/);
+  assert.match(html, /property="og:image" content="([^"]+)"/);
+  assert.equal(html.match(/property="og:image" content="([^"]+)"/)[1], THEME_IMAGE);
+  assert.match(html, /property="og:image:width" content="664"/);
+  assert.match(html, /property="og:image:height" content="504"/);
+  assert.match(html, /name="twitter:card" content="summary_large_image"/);
+  assert.deepEqual(
+    [...html.matchAll(/name="theme-color" content="([^"]+)"/g)].map(
+      (match) => match[1],
+    ),
+    ["#8d543c"],
+  );
+
+  const payload = html.match(
+    /<script id="discord:component-embed" type="application\/json">(.*?)<\/script>/s,
+  )?.[1];
+  assert.ok(payload);
+  assert.ok(Buffer.byteLength(payload) <= 3000);
+  const { component } = JSON.parse(payload);
+  assert.equal(component.type, 17);
+  assert.equal(component.accent_color, 0x8d543c);
+  assert.match(component.components[0].content, /^## Orange, Green & Teal theme\n/);
+  assert.doesNotMatch(component.components[0].content, /#[0-9a-f]{6}/);
+  assert.equal(component.components[1].items[0].media.url, THEME_IMAGE);
+  assert.deepEqual(component.components[2], {
+    type: 1,
+    components: [
+      { type: 2, style: 5, label: "Get SakuraCord", url: "https://sakuracord.app" },
+    ],
+  });
+});
+
+test("theme links show a theme page to people and 404 when invalid", async () => {
+  const response = await render(THEME_PATH);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<h1[^>]*>Orange, Green &amp; Teal theme<\/h1>/);
+  assert.match(html, new RegExp(`src="/theme-preview/v1/${THEME_TOKEN}\\.png"`));
+
+  // A corrupted checksum, which SakuraCord ignores too.
+  const invalid = await render(`/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`);
+  const invalidHtml = await invalid.text();
+  assert.ok(
+    invalid.status === 404 ||
+      invalidHtml.includes('name="robots" content="noindex"'),
+    "404 status or streamed Next.js not-found marker",
+  );
+  assert.doesNotMatch(invalidHtml, /discord:component-embed/);
+});
+
+test("renders theme previews as cacheable PNGs in the theme's colors", async () => {
+  const response = await render(`/theme-preview/v1/${THEME_TOKEN}.png?v=2`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.match(response.headers.get("cache-control"), /immutable/);
+
+  const png = Buffer.from(await response.arrayBuffer());
+  assert.equal(png.readUInt32BE(16), 664);
+  assert.equal(png.readUInt32BE(20), 504);
+  const { inflateSync } = await import("node:zlib");
+  const idat = [];
+  for (let offset = 8; offset < png.length; ) {
+    const length = png.readUInt32BE(offset);
+    if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") {
+      idat.push(png.subarray(offset + 8, offset + 8 + length));
+    }
+    offset += length + 12;
+  }
+  const scanlines = inflateSync(Buffer.concat(idat));
+  const stride = 664 * 4 + 1;
+  const pixel = (x, y) => {
+    const row = scanlines.subarray(y * stride + 1, (y + 1) * stride);
+    const value = [0, 0, 0, 0];
+    for (let column = 0; column <= x; column++) {
+      for (let channel = 0; channel < 4; channel++) {
+        value[channel] = (value[channel] + row[column * 4 + channel]) & 0xff;
+      }
+    }
+    return `#${value
+      .slice(0, 3)
+      .map((channel) => channel.toString(16).padStart(2, "0"))
+      .join("")}/${value[3]}`;
+  };
+  // Dot centres sit 10pt apart from (24pt + 7.5pt) at 8px per point.
+  assert.equal(pixel(252, 252), "#8d543c/255");
+  assert.equal(pixel(332, 252), "#638d3a/255");
+  assert.equal(pixel(412, 252), "#378d73/255");
+  assert.equal(pixel(0, 0).split("/")[1], "0");
+
+  assert.equal(
+    (await render(`/theme-preview/v1/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
+      .status,
+    404,
+  );
 });
 
 test("redirects downloads to the latest versioned DMG", async (t) => {
