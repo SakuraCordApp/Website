@@ -194,7 +194,12 @@ const worker = {
       },
       () => handler.fetch(request, env, ctx),
     );
-    if (!url.pathname.startsWith("/settings")) return response;
+    // Match the router, which decodes the path (/%73ettings is /settings).
+    let pathname = url.pathname;
+    try {
+      pathname = decodeURIComponent(pathname);
+    } catch {}
+    if (!pathname.startsWith("/settings")) return response;
 
     // Settings deeplinks show link-preview bots a preview and send everyone
     // else to the homepage, so no cache may share one answer between them.

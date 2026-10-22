@@ -178,6 +178,11 @@ test("theme links preview only for link-preview bots and redirect people home", 
       invalidPath,
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
     ],
+    // An encoded path reaches the same route and must get the same headers.
+    [
+      THEME_PATH.replace("/settings", "/%73ettings"),
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    ],
     // Pinterest's in-app browser is a person, not its crawler.
     [
       THEME_PATH,
@@ -200,6 +205,8 @@ test("theme links preview only for link-preview bots and redirect people home", 
     "Mozilla/5.0 (compatible; Pinterestbot/1.0; +http://www.pinterest.com/bot.html)",
     "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36 (compatible; GoogleMessages)",
     "Snap URL Preview Service; bot; snapchat; https://developers.snap.com/robots",
+    "Mozilla/5.0 (compatible; MicrosoftPreview/2.0; +https://aka.ms/MicrosoftPreview)",
+    "Iframely/1.3.1 (+https://iframely.com/docs/about)",
   ]) {
     const response = await render(THEME_PATH, { "user-agent": userAgent });
     assert.equal(response.status, 200, userAgent);
