@@ -169,11 +169,22 @@ test("server-renders a palette embed for theme links", async () => {
 test("theme links preview only for link-preview bots and redirect people home", async () => {
   // A corrupted checksum, which SakuraCord ignores too.
   const invalidPath = `/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`;
-  for (const path of [THEME_PATH, invalidPath]) {
-    const response = await render(path, {
-      "user-agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    });
+  for (const [path, userAgent] of [
+    [
+      THEME_PATH,
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    ],
+    [
+      invalidPath,
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    ],
+    // Pinterest's in-app browser is a person, not its crawler.
+    [
+      THEME_PATH,
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [Pinterest/iOS]",
+    ],
+  ]) {
+    const response = await render(path, { "user-agent": userAgent });
     assert.equal(response.status, 307);
     assert.equal(response.headers.get("location"), "http://localhost/");
     assert.match(response.headers.get("vary"), /User-Agent/);
@@ -186,6 +197,9 @@ test("theme links preview only for link-preview bots and redirect people home", 
     "Twitterbot/1.0",
     "TelegramBot (like TwitterBot)",
     "facebookexternalhit/1.1 Facebot Twitterbot/1.0",
+    "Mozilla/5.0 (compatible; Pinterestbot/1.0; +http://www.pinterest.com/bot.html)",
+    "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36 (compatible; GoogleMessages)",
+    "Snap URL Preview Service; bot; snapchat; https://developers.snap.com/robots",
   ]) {
     const response = await render(THEME_PATH, { "user-agent": userAgent });
     assert.equal(response.status, 200, userAgent);
