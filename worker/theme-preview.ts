@@ -239,8 +239,9 @@ export async function themePreviewResponse(
     request.method === "HEAD" ? new Response(null, response) : response;
 
   const url = new URL(request.url);
+  // v1 URLs from earlier embeds still resolve, to the current design.
   const token = url.pathname.match(
-    /^\/theme-preview\/v2\/([A-Za-z0-9_-]+)\.png$/,
+    /^\/theme-preview\/v[12]\/([A-Za-z0-9_-]+)\.png$/,
   )?.[1];
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;

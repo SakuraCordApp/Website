@@ -225,6 +225,10 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
   assert.equal(pixel(0, 0).split("/")[1], "0");
 
   assert.equal(
+    (await render(`/theme-preview/v1/${THEME_TOKEN}.png`)).status,
+    200,
+  );
+  assert.equal(
     (await render(`/theme-preview/v2/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
       .status,
     404,
