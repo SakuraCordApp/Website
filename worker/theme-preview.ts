@@ -6,6 +6,7 @@ import {
   renderedRGB,
   THEME_CARD,
   THEME_PREVIEW_SIZE,
+  themePreviewPath,
   type SharedTheme,
 } from "../app/lib/theme-link";
 
@@ -25,11 +26,10 @@ const BUTTON_OUTLINE_OPACITY = 0.07;
 // Signed distance to a rounded rectangle, from per-axis offsets past its
 // straight edges.
 function roundedRectDistance(qx: number, qy: number, radius: number) {
-  return (
-    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) +
-    Math.min(Math.max(qx, qy), 0) -
-    radius
-  );
+  // Only the rounded corners need the Euclidean distance.
+  return qx > 0 && qy > 0
+    ? Math.hypot(qx, qy) - radius
+    : Math.max(qx, qy) - radius;
 }
 
 // Evenly spaced stops across [left, right], like NSGradient(colors:) at
@@ -81,38 +81,37 @@ function renderThemePreview(theme: SharedTheme) {
     return [rgb.red, rgb.green, rgb.blue];
   });
   const surface = CONTROL_BACKGROUND[appearance];
-  const white = [1, 1, 1];
-
+  const centerX = cardWidth / 2;
   const centerY = cardHeight / 2;
   const dotRadius = dotDiameter / 2;
   const dotReach = dotRadius + 1 / scale;
   const dotX = palette.map(
     (_, index) => inset + dotRadius + index * dotStep,
   );
+  const dotsRight = dotX[dotX.length - 1] + dotReach;
   const buttonRight = cardWidth - inset;
   const buttonLeft = buttonRight - buttonWidth;
   const buttonRadius = buttonHeight / 2;
+  const buttonCenterX = (buttonLeft + buttonRight) / 2;
+  const edgeReach = 1 / scale;
   const cardColors = columnGradient(palette, width, 0, cardWidth);
   const buttonColors = columnGradient(palette, width, buttonLeft, buttonRight);
 
   const pixels = new Uint8Array(width * height * 4);
   const color = new Float64Array(3);
   for (let y = 0; y < height; y++) {
-    const pointY = (y + 0.5) / scale;
-    const offsetY = pointY - centerY;
+    const offsetY = (y + 0.5) / scale - centerY;
     const cardQY = Math.abs(offsetY) - (cardHeight / 2 - cornerRadius);
-    const buttonQY = Math.abs(offsetY) - (buttonHeight / 2 - buttonRadius);
-    const inButtonRows = Math.abs(offsetY) < buttonHeight / 2 + 1 / scale;
+    const inButtonRows = Math.abs(offsetY) < buttonRadius + edgeReach;
     const inDotRows = Math.abs(offsetY) < dotReach;
     for (let x = 0; x < width; x++) {
       const pointX = (x + 0.5) / scale;
       const cardDistance = roundedRectDistance(
-        Math.abs(pointX - cardWidth / 2) - (cardWidth / 2 - cornerRadius),
+        Math.abs(pointX - centerX) - (centerX - cornerRadius),
         cardQY,
         cornerRadius,
       );
       const cardCoverage = clamp(0.5 - cardDistance * scale);
-      const offset = (y * width + x) * 4;
       if (cardCoverage === 0) continue;
 
       // The gradient shows as the border around the 94% surface.
@@ -123,11 +122,15 @@ function renderThemePreview(theme: SharedTheme) {
         color[channel] = edge + (surface[channel] - edge) * surfaceCoverage;
       }
 
-      if (inButtonRows && pointX > buttonLeft - 1 && pointX < buttonRight + 1) {
+      if (
+        inButtonRows &&
+        pointX > buttonLeft - edgeReach &&
+        pointX < buttonRight + edgeReach
+      ) {
+        // The button is a capsule, so it has no straight vertical edge.
         const buttonDistance = roundedRectDistance(
-          Math.abs(pointX - (buttonLeft + buttonRight) / 2) -
-            (buttonWidth / 2 - buttonRadius),
-          buttonQY,
+          Math.abs(pointX - buttonCenterX) - (buttonWidth / 2 - buttonRadius),
+          Math.abs(offsetY),
           buttonRadius,
         );
         const buttonCoverage = clamp(0.5 - buttonDistance * scale);
@@ -136,28 +139,32 @@ function renderThemePreview(theme: SharedTheme) {
           clamp((buttonDistance + outlineWidth) * scale + 0.5);
         for (let channel = 0; channel < 3; channel++) {
           const shaded = buttonColors[x * 3 + channel] * (1 - BUTTON_SHADE);
-          const fill = shaded + (white[channel] - shaded) * buttonOutline;
+          const fill = shaded + (1 - shaded) * buttonOutline;
           color[channel] += (fill - color[channel]) * buttonCoverage;
         }
       }
 
       // Later dots overlap earlier ones; each has a 1pt outline stroked just
       // inside its edge.
-      for (let dot = 0; inDotRows && dot < palette.length; dot++) {
-        if (Math.abs(pointX - dotX[dot]) >= dotReach) continue;
-        const dotDistance = Math.hypot(pointX - dotX[dot], offsetY) - dotRadius;
-        const dotCoverage = clamp(0.5 - dotDistance * scale);
-        if (dotCoverage === 0) continue;
-        const outlineCoverage =
-          OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
-        for (let channel = 0; channel < 3; channel++) {
-          const fill =
-            palette[dot][channel] +
-            (surface[channel] - palette[dot][channel]) * outlineCoverage;
-          color[channel] += (fill - color[channel]) * dotCoverage;
+      if (inDotRows && pointX < dotsRight) {
+        for (let dot = 0; dot < palette.length; dot++) {
+          if (Math.abs(pointX - dotX[dot]) >= dotReach) continue;
+          const dotDistance =
+            Math.hypot(pointX - dotX[dot], offsetY) - dotRadius;
+          const dotCoverage = clamp(0.5 - dotDistance * scale);
+          if (dotCoverage === 0) continue;
+          const outlineCoverage =
+            OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
+          for (let channel = 0; channel < 3; channel++) {
+            const fill =
+              palette[dot][channel] +
+              (surface[channel] - palette[dot][channel]) * outlineCoverage;
+            color[channel] += (fill - color[channel]) * dotCoverage;
+          }
         }
       }
 
+      const offset = (y * width + x) * 4;
       for (let channel = 0; channel < 3; channel++) {
         pixels[offset + channel] = Math.round(clamp(color[channel]) * 255);
       }
@@ -245,10 +252,11 @@ export async function themePreviewResponse(
   )?.[1];
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;
-  if (!theme) return new Response("Unknown theme", { status: 404 });
+  if (!token || !theme) return new Response("Unknown theme", { status: 404 });
 
-  // Key on the path alone so query strings can't force fresh renders.
-  const cacheKey = new Request(`${url.origin}${url.pathname}`);
+  // Key on the current path alone, so aliases share one entry and query
+  // strings can't force fresh renders.
+  const cacheKey = new Request(`${url.origin}${themePreviewPath(token)}`);
   const cache = (caches as CacheStorage & { default: Cache }).default;
   const cached = await cache.match(cacheKey);
   if (cached) return reply(cached);
@@ -256,7 +264,7 @@ export async function themePreviewResponse(
   const png = await encodePNG(renderThemePreview(theme));
   const init = {
     headers: {
-      // The token is the whole theme, so a preview never changes.
+      // The token is the whole theme, so a versioned preview never changes.
       "Cache-Control": "public, max-age=31536000, immutable",
       "Content-Type": "image/png",
       "X-Content-Type-Options": "nosniff",

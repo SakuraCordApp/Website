@@ -78,9 +78,7 @@ function componentEmbed({
 export async function generateMetadata({
   params,
 }: ThemeLinkPageProps): Promise<Metadata> {
-  const { token, theme, name } = loadThemeLink(
-    (await params).token,
-  );
+  const { token, theme, name } = loadThemeLink((await params).token);
   const title = `${name} · SakuraCord`;
   const image = theme
     ? {
@@ -96,6 +94,8 @@ export async function generateMetadata({
         alt: "SakuraCord app icon",
       };
 
+  const shared = { title, description: DESCRIPTION, images: [image] };
+
   return {
     title,
     description: DESCRIPTION,
@@ -104,16 +104,9 @@ export async function generateMetadata({
       type: "website",
       url: `/settings/themes/${token}`,
       siteName: "SakuraCord",
-      title,
-      description: DESCRIPTION,
-      images: [image],
+      ...shared,
     },
-    twitter: {
-      card: theme ? "summary_large_image" : "summary",
-      title,
-      description: DESCRIPTION,
-      images: [image],
-    },
+    twitter: { card: theme ? "summary_large_image" : "summary", ...shared },
   };
 }
 
