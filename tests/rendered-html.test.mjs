@@ -117,7 +117,7 @@ test("redirects every human settings request to the homepage", async () => {
 
 const THEME_TOKEN = "AQJKz_VpjwzNszNAALhRczO9cP__yjw";
 const THEME_PATH = `/settings/themes/${THEME_TOKEN}`;
-const THEME_IMAGE = `https://sakuracord.app/theme-preview/v2/${THEME_TOKEN}.png`;
+const THEME_IMAGE = `https://sakuracord.app/theme-preview/v3/${THEME_TOKEN}.png`;
 
 test("server-renders a palette embed for theme links", async () => {
   const response = await render(THEME_PATH, {
@@ -129,7 +129,7 @@ test("server-renders a palette embed for theme links", async () => {
 
   assert.match(html, /<title>Orange, Green &amp; Teal theme · SakuraCord<\/title>/);
   assert.equal(html.match(/property="og:image" content="([^"]+)"/)[1], THEME_IMAGE);
-  assert.match(html, /property="og:image:width" content="1680"/);
+  assert.match(html, /property="og:image:width" content="1140"/);
   assert.match(html, /property="og:image:height" content="222"/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(
@@ -171,7 +171,7 @@ test("theme links show a theme page to people and 404 when invalid", async () =>
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /<h1[^>]*>Orange, Green &amp; Teal theme<\/h1>/);
-  assert.match(html, new RegExp(`src="/theme-preview/v2/${THEME_TOKEN}\\.png"`));
+  assert.match(html, new RegExp(`src="/theme-preview/v3/${THEME_TOKEN}\\.png"`));
 
   // A corrupted checksum, which SakuraCord ignores too.
   const invalid = await render(`/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`);
@@ -185,13 +185,13 @@ test("theme links show a theme page to people and 404 when invalid", async () =>
 });
 
 test("renders theme previews as cacheable PNGs in the theme's colors", async () => {
-  const response = await render(`/theme-preview/v2/${THEME_TOKEN}.png?v=2`);
+  const response = await render(`/theme-preview/v3/${THEME_TOKEN}.png?v=2`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "image/png");
   assert.match(response.headers.get("cache-control"), /immutable/);
 
   const png = Buffer.from(await response.arrayBuffer());
-  assert.equal(png.readUInt32BE(16), 1680);
+  assert.equal(png.readUInt32BE(16), 1140);
   assert.equal(png.readUInt32BE(20), 222);
   const { inflateSync } = await import("node:zlib");
   const idat = [];
@@ -203,7 +203,7 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
     offset += length + 12;
   }
   const scanlines = inflateSync(Buffer.concat(idat));
-  const stride = 1680 * 4 + 1;
+  const stride = 1140 * 4 + 1;
   const pixel = (x, y) => {
     const row = scanlines.subarray(y * stride + 1, (y + 1) * stride);
     const value = [0, 0, 0, 0];
@@ -229,7 +229,11 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
     200,
   );
   assert.equal(
-    (await render(`/theme-preview/v2/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
+    (await render(`/theme-preview/v2/${THEME_TOKEN}.png`)).status,
+    200,
+  );
+  assert.equal(
+    (await render(`/theme-preview/v3/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
       .status,
     404,
   );

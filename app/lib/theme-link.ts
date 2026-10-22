@@ -133,10 +133,12 @@ export function decodeThemeToken(token: string): ThemeDecodeResult | null {
 }
 
 // The in-chat theme link card, in points (SakuraCordDeepLinkSupport.swift,
-// NativeTimelineRowPainterMessage.swift), drawn at 3px per point.
+// NativeTimelineRowPainterMessage.swift), drawn at 3px per point. The app
+// narrows the card to fit the chat; 380pt keeps it above the minimum height
+// Discord's media gallery crops wide images to.
 export const THEME_CARD = {
   scale: 3,
-  width: 560,
+  width: 380,
   height: 74,
   inset: 14,
   cornerRadius: 18,
@@ -154,7 +156,7 @@ export const THEME_PREVIEW_SIZE = {
 };
 
 export function themePreviewPath(token: string) {
-  return `/theme-preview/v2/${token}.png`;
+  return `/theme-preview/v3/${token}.png`;
 }
 
 export function activeColors(theme: SharedTheme): ThemeColor[] {
