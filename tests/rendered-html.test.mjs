@@ -117,7 +117,7 @@ test("redirects every human settings request to the homepage", async () => {
 
 const THEME_TOKEN = "AQJKz_VpjwzNszNAALhRczO9cP__yjw";
 const THEME_PATH = `/settings/themes/${THEME_TOKEN}`;
-const THEME_IMAGE = `https://sakuracord.app/theme-preview/v5/${THEME_TOKEN}.png`;
+const THEME_IMAGE = `https://sakuracord.app/theme-preview/v6/${THEME_TOKEN}.png`;
 
 test("server-renders a palette embed for theme links", async () => {
   const response = await render(THEME_PATH, {
@@ -129,7 +129,7 @@ test("server-renders a palette embed for theme links", async () => {
 
   assert.match(html, /<title>Orange, Green &amp; Teal theme · SakuraCord<\/title>/);
   assert.equal(html.match(/property="og:image" content="([^"]+)"/)[1], THEME_IMAGE);
-  assert.match(html, /property="og:image:width" content="1600"/);
+  assert.match(html, /property="og:image:width" content="1664"/);
   assert.match(html, /property="og:image:height" content="208"/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(
@@ -227,13 +227,13 @@ test("theme links preview only for link-preview bots and redirect people home", 
 });
 
 test("renders theme previews as cacheable PNGs in the theme's colors", async () => {
-  const response = await render(`/theme-preview/v5/${THEME_TOKEN}.png?v=2`);
+  const response = await render(`/theme-preview/v6/${THEME_TOKEN}.png?v=2`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "image/png");
   assert.match(response.headers.get("cache-control"), /immutable/);
 
   const png = Buffer.from(await response.arrayBuffer());
-  assert.equal(png.readUInt32BE(16), 1600);
+  assert.equal(png.readUInt32BE(16), 1664);
   assert.equal(png.readUInt32BE(20), 208);
   const { inflateSync } = await import("node:zlib");
   const idat = [];
@@ -245,7 +245,7 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
     offset += length + 12;
   }
   const scanlines = inflateSync(Buffer.concat(idat));
-  const stride = 1600 * 4 + 1;
+  const stride = 1664 * 4 + 1;
   const pixel = (x, y) => {
     const row = scanlines.subarray(y * stride + 1, (y + 1) * stride);
     const value = [0, 0, 0, 0];
@@ -259,24 +259,24 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
       .map((channel) => channel.toString(16).padStart(2, "0"))
       .join("")}/${value[3]}`;
   };
-  // Dot centres sit 16pt apart from the 20pt margin + 10pt inset + 12pt
+  // Dot centres sit 16pt apart from the 28pt margin + 10pt inset + 12pt
   // radius, on the bar's centre line, at 4px per point.
-  assert.equal(pixel(168, 104), "#8d543c/255");
-  assert.equal(pixel(232, 104), "#638d3a/255");
-  assert.equal(pixel(296, 104), "#378d73/255");
+  assert.equal(pixel(200, 104), "#8d543c/255");
+  assert.equal(pixel(264, 104), "#638d3a/255");
+  assert.equal(pixel(328, 104), "#378d73/255");
   // The safe margin around the card is transparent.
   assert.equal(pixel(0, 0).split("/")[1], "0");
   assert.equal(pixel(60, 104).split("/")[1], "0");
 
   // Earlier embeds' image URLs still resolve.
-  for (const version of ["v1", "v2", "v3", "v4"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5"]) {
     assert.equal(
       (await render(`/theme-preview/${version}/${THEME_TOKEN}.png`)).status,
       200,
     );
   }
   assert.equal(
-    (await render(`/theme-preview/v5/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
+    (await render(`/theme-preview/v6/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
       .status,
     404,
   );

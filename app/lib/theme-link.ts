@@ -142,7 +142,7 @@ export const THEME_CARD = {
   scale: 4,
   width: 360,
   height: 44,
-  marginX: 20,
+  marginX: 28,
   marginY: 4,
   inset: 10,
   cornerRadius: 11,
@@ -160,7 +160,7 @@ export const THEME_PREVIEW_SIZE = {
 };
 
 export function themePreviewPath(token: string) {
-  return `/theme-preview/v5/${token}.png`;
+  return `/theme-preview/v6/${token}.png`;
 }
 
 export function activeColors(theme: SharedTheme): ThemeColor[] {

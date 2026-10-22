@@ -253,7 +253,7 @@ export async function themePreviewResponse(
   const url = new URL(request.url);
   // URLs from earlier embeds still resolve, to the current design.
   const token = url.pathname.match(
-    /^\/theme-preview\/v[1-5]\/([A-Za-z0-9_-]+)\.png$/,
+    /^\/theme-preview\/v[1-6]\/([A-Za-z0-9_-]+)\.png$/,
   )?.[1];
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;
