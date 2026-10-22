@@ -1,7 +1,8 @@
-/* eslint-disable @next/next/no-img-element -- The preview is rendered by the worker; vinext has no runtime Next image optimizer. */
 import type { Metadata, Viewport } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
+import { isLinkPreviewBot } from "../../../lib/link-preview-bots";
 import {
   decodeThemeToken,
   previewAppearance,
@@ -21,8 +22,11 @@ type ThemeLinkPageProps = {
   params: Promise<{ token: string }>;
 };
 
-// Metadata, viewport and the page all need the decoded link.
-const loadThemeLink = cache((token: string) => {
+// Theme links exist for link previews: people opening one in a browser go to
+// the homepage, as before. Metadata, viewport and the page all need the
+// decoded link.
+const loadThemeLink = cache(async (token: string) => {
+  if (!isLinkPreviewBot((await headers()).get("user-agent"))) redirect("/");
   const decoded = decodeThemeToken(token);
   if (!decoded) notFound();
   const theme = decoded.kind === "current" ? decoded.theme : decoded.preview;
@@ -43,7 +47,7 @@ function componentEmbed({
   theme,
   name,
   accent,
-}: ReturnType<typeof loadThemeLink>) {
+}: Awaited<ReturnType<typeof loadThemeLink>>) {
   return {
     component: {
       type: 17,
@@ -78,7 +82,7 @@ function componentEmbed({
 export async function generateMetadata({
   params,
 }: ThemeLinkPageProps): Promise<Metadata> {
-  const { token, theme, name } = loadThemeLink((await params).token);
+  const { token, theme, name } = await loadThemeLink((await params).token);
   const title = `${name} · SakuraCord`;
   const image = theme
     ? {
@@ -113,44 +117,22 @@ export async function generateMetadata({
 export async function generateViewport({
   params,
 }: ThemeLinkPageProps): Promise<Viewport> {
-  const { accent } = loadThemeLink((await params).token);
+  const { accent } = await loadThemeLink((await params).token);
   return { themeColor: accent, colorScheme: "dark" };
 }
 
 export default async function ThemeLinkPage({ params }: ThemeLinkPageProps) {
-  const themeLink = loadThemeLink((await params).token);
+  const themeLink = await loadThemeLink((await params).token);
   return (
-    <>
-      <script
-        id="discord:component-embed"
-        type="application/json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(componentEmbed(themeLink)).replace(
-            /</g,
-            "\\u003c",
-          ),
-        }}
-      />
-      <main
-        id="main-content"
-        className="community-page section-shell community-empty"
-      >
-        <h1>{themeLink.name}</h1>
-        <p>{DESCRIPTION}</p>
-        {themeLink.theme && (
-          <img
-            className="theme-link-preview"
-            src={themePreviewPath(themeLink.token)}
-            {...THEME_PREVIEW_SIZE}
-            alt={`${themeLink.name} palette`}
-          />
-        )}
-        <p>
-          <a className="button button-primary" href="/download">
-            Download SakuraCord
-          </a>
-        </p>
-      </main>
-    </>
+    <script
+      id="discord:component-embed"
+      type="application/json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(componentEmbed(themeLink)).replace(
+          /</g,
+          "\\u003c",
+        ),
+      }}
+    />
   );
 }

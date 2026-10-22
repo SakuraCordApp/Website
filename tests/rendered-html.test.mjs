@@ -166,15 +166,36 @@ test("server-renders a palette embed for theme links", async () => {
   });
 });
 
-test("theme links show a theme page to people and 404 when invalid", async () => {
-  const response = await render(THEME_PATH);
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  assert.match(html, /<h1[^>]*>Orange, Green &amp; Teal theme<\/h1>/);
-  assert.match(html, new RegExp(`src="/theme-preview/v5/${THEME_TOKEN}\\.png"`));
-
+test("theme links preview only for link-preview bots and redirect people home", async () => {
   // A corrupted checksum, which SakuraCord ignores too.
-  const invalid = await render(`/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`);
+  const invalidPath = `/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`;
+  for (const path of [THEME_PATH, invalidPath]) {
+    const response = await render(path, {
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    });
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get("location"), "http://localhost/");
+    assert.match(response.headers.get("vary"), /User-Agent/);
+    assert.match(response.headers.get("cache-control"), /no-store/);
+  }
+
+  for (const userAgent of [
+    "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+    "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+    "Twitterbot/1.0",
+    "TelegramBot (like TwitterBot)",
+    "facebookexternalhit/1.1 Facebot Twitterbot/1.0",
+  ]) {
+    const response = await render(THEME_PATH, { "user-agent": userAgent });
+    assert.equal(response.status, 200, userAgent);
+    assert.match(response.headers.get("vary"), /User-Agent/);
+    const html = await response.text();
+    assert.match(html, /discord:component-embed/);
+    assert.doesNotMatch(html, /<h1[^>]*>Orange/);
+  }
+
+  const invalid = await render(invalidPath, { "user-agent": "Discordbot/2.0" });
   const invalidHtml = await invalid.text();
   assert.ok(
     invalid.status === 404 ||

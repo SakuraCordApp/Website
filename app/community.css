@@ -239,13 +239,6 @@ html {
   margin-top: 14px;
   color: var(--muted);
 }
-.theme-link-preview {
-  display: block;
-  width: min(420px, 100%);
-  height: auto;
-  margin-top: 24px;
-  border-radius: 14px;
-}
 .community-retry {
   display: inline-block;
   margin-top: 20px;

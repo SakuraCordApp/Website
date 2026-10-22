@@ -186,7 +186,7 @@ const worker = {
       );
     }
 
-    return roadmapService.run(
+    const response = await roadmapService.run(
       {
         fetch: (input) => env.ROADMAP.fetch(input),
         responses: new Map(),
@@ -194,6 +194,14 @@ const worker = {
       },
       () => handler.fetch(request, env, ctx),
     );
+    if (!url.pathname.startsWith("/settings")) return response;
+
+    // Settings deeplinks show link-preview bots a preview and send everyone
+    // else to the homepage, so no cache may share one answer between them.
+    const varied = new Response(response.body, response);
+    varied.headers.append("Vary", "User-Agent");
+    varied.headers.set("Cache-Control", "private, no-store");
+    return varied;
   },
 };
 
