@@ -132,30 +132,29 @@ export function decodeThemeToken(token: string): ThemeDecodeResult | null {
     : { kind: "current", theme };
 }
 
-// The in-chat theme link card's palette geometry, in points
-// (SakuraCordDeepLinkSupport.swift, NativeTimelineRowPainterMessage.swift).
+// The in-chat theme link card, in points (SakuraCordDeepLinkSupport.swift,
+// NativeTimelineRowPainterMessage.swift), drawn at 3px per point.
 export const THEME_CARD = {
-  scale: 8,
-  padding: 14,
+  scale: 3,
+  width: 560,
+  height: 74,
+  inset: 14,
   cornerRadius: 18,
+  borderWidth: 1,
   dotDiameter: 15,
   dotStep: 10,
   outlineWidth: 1,
-  glowMargin: 10,
+  buttonWidth: 196,
+  buttonHeight: 32,
+};
+
+export const THEME_PREVIEW_SIZE = {
+  width: THEME_CARD.width * THEME_CARD.scale,
+  height: THEME_CARD.height * THEME_CARD.scale,
 };
 
 export function themePreviewPath(token: string) {
-  return `/theme-preview/v1/${token}.png`;
-}
-
-export function themePreviewSize(theme: SharedTheme) {
-  const { scale, padding, dotDiameter, dotStep, glowMargin } = THEME_CARD;
-  const inset = padding + glowMargin;
-  return {
-    width:
-      (dotDiameter + dotStep * (theme.activeColorCount - 1) + inset * 2) * scale,
-    height: (dotDiameter + inset * 2) * scale,
-  };
+  return `/theme-preview/v2/${token}.png`;
 }
 
 export function activeColors(theme: SharedTheme): ThemeColor[] {

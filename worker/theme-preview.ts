@@ -5,7 +5,7 @@ import {
   previewAppearance,
   renderedRGB,
   THEME_CARD,
-  themePreviewSize,
+  THEME_PREVIEW_SIZE,
   type SharedTheme,
 } from "../app/lib/theme-link";
 
@@ -14,138 +14,154 @@ const CONTROL_BACKGROUND = {
   dark: [30 / 255, 30 / 255, 30 / 255],
   light: [1, 1, 1],
 };
-// sakuraCordDeepLinkCard: the surface covers the gradient at 94% inside a 1pt
-// border, dot outlines are 92%, and the glow is a 13pt NSShadow of 28% accent
-// cast by the card's 20% accent fill.
+// sakuraCordDeepLinkCard and sakuraCordButton: the surface covers the
+// gradient at 94% inside the border, dot outlines are 92%, and the idle
+// button darkens its gradient by 12% under a 7% white outline.
 const SURFACE_OPACITY = 0.94;
 const OUTLINE_OPACITY = 0.92;
-const BORDER_WIDTH = 1;
-const GLOW_SIGMA = 13 / 2; // NSShadow's blur radius spans about two sigma.
-const GLOW_OPACITY = 0.28 * 0.2;
+const BUTTON_SHADE = 0.12;
+const BUTTON_OUTLINE_OPACITY = 0.07;
 
-// Complementary error function for non-negative values
-// (Abramowitz–Stegun 7.1.26), for the glow falloff.
-function erfc(value: number) {
-  const t = 1 / (1 + 0.3275911 * value);
+// Signed distance to a rounded rectangle, from per-axis offsets past its
+// straight edges.
+function roundedRectDistance(qx: number, qy: number, radius: number) {
   return (
-    t *
-    (0.254829592 +
-      t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) *
-    Math.exp(-value * value)
+    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) +
+    Math.min(Math.max(qx, qy), 0) -
+    radius
   );
 }
 
-// Draws the in-chat theme link card's palette: overlapping dots on the card
-// surface, with its gradient border and accent glow, on a transparent canvas.
-// Returns straight (non-premultiplied) RGBA. The pixel loop stays
-// allocation-free; per-column and per-row terms are hoisted out of it.
+// Evenly spaced stops across [left, right], like NSGradient(colors:) at
+// angle 0, sampled for each pixel column.
+function columnGradient(
+  palette: number[][],
+  width: number,
+  left: number,
+  right: number,
+) {
+  const colors = new Float64Array(width * 3);
+  for (let x = 0; x < width; x++) {
+    const position =
+      clamp(((x + 0.5) / THEME_CARD.scale - left) / (right - left)) *
+      (palette.length - 1);
+    const index = Math.min(Math.floor(position), Math.max(palette.length - 2, 0));
+    const next = Math.min(index + 1, palette.length - 1);
+    for (let channel = 0; channel < 3; channel++) {
+      colors[x * 3 + channel] =
+        palette[index][channel] +
+        (palette[next][channel] - palette[index][channel]) * (position - index);
+    }
+  }
+  return colors;
+}
+
+// Draws the in-chat theme link card as a bar: the overlapping palette dots on
+// the left and the gradient button on the right, without their labels.
+// Returns straight (non-premultiplied) RGBA; the pixel loop stays
+// allocation-free.
 function renderThemePreview(theme: SharedTheme) {
-  const { scale, padding, cornerRadius, dotDiameter, dotStep, outlineWidth, glowMargin } =
-    THEME_CARD;
-  const { width, height } = themePreviewSize(theme);
+  const {
+    scale,
+    width: cardWidth,
+    height: cardHeight,
+    inset,
+    cornerRadius,
+    borderWidth,
+    dotDiameter,
+    dotStep,
+    outlineWidth,
+    buttonWidth,
+    buttonHeight,
+  } = THEME_CARD;
+  const { width, height } = THEME_PREVIEW_SIZE;
   const appearance = previewAppearance(theme);
   const palette = activeColors(theme).map((color) => {
     const rgb = renderedRGB(theme, color, appearance);
     return [rgb.red, rgb.green, rgb.blue];
   });
-  const accent = palette[0];
   const surface = CONTROL_BACKGROUND[appearance];
+  const white = [1, 1, 1];
 
-  const cardLeft = glowMargin;
-  const cardTop = glowMargin;
-  const cardRight = width / scale - glowMargin;
-  const cardBottom = height / scale - glowMargin;
-  const centerX = (cardLeft + cardRight) / 2;
-  const centerY = (cardTop + cardBottom) / 2;
-  const straightHalfWidth = (cardRight - cardLeft) / 2 - cornerRadius;
-  const straightHalfHeight = (cardBottom - cardTop) / 2 - cornerRadius;
+  const centerY = cardHeight / 2;
   const dotRadius = dotDiameter / 2;
   const dotReach = dotRadius + 1 / scale;
   const dotX = palette.map(
-    (_, index) => cardLeft + padding + dotRadius + index * dotStep,
+    (_, index) => inset + dotRadius + index * dotStep,
   );
-
-  // NSGradient(colors:) at angle 0 spans the card's bounds, so the border
-  // colour depends only on the column.
-  const border = new Float64Array(width * 3);
-  for (let x = 0; x < width; x++) {
-    const position =
-      clamp(((x + 0.5) / scale - cardLeft) / (cardRight - cardLeft)) *
-      (palette.length - 1);
-    const index = Math.min(Math.floor(position), Math.max(palette.length - 2, 0));
-    const next = Math.min(index + 1, palette.length - 1);
-    for (let channel = 0; channel < 3; channel++) {
-      border[x * 3 + channel] =
-        palette[index][channel] +
-        (palette[next][channel] - palette[index][channel]) * (position - index);
-    }
-  }
+  const buttonRight = cardWidth - inset;
+  const buttonLeft = buttonRight - buttonWidth;
+  const buttonRadius = buttonHeight / 2;
+  const cardColors = columnGradient(palette, width, 0, cardWidth);
+  const buttonColors = columnGradient(palette, width, buttonLeft, buttonRight);
 
   const pixels = new Uint8Array(width * height * 4);
   const color = new Float64Array(3);
   for (let y = 0; y < height; y++) {
     const pointY = (y + 0.5) / scale;
-    const qy = Math.abs(pointY - centerY) - straightHalfHeight;
-    const dotOffsetY = pointY - centerY;
-    const inDotRows = Math.abs(dotOffsetY) < dotReach;
+    const offsetY = pointY - centerY;
+    const cardQY = Math.abs(offsetY) - (cardHeight / 2 - cornerRadius);
+    const buttonQY = Math.abs(offsetY) - (buttonHeight / 2 - buttonRadius);
+    const inButtonRows = Math.abs(offsetY) < buttonHeight / 2 + 1 / scale;
+    const inDotRows = Math.abs(offsetY) < dotReach;
     for (let x = 0; x < width; x++) {
       const pointX = (x + 0.5) / scale;
-      // Signed distance to the card's rounded rectangle.
-      const qx = Math.abs(pointX - centerX) - straightHalfWidth;
-      const cardDistance =
-        Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) +
-        Math.min(Math.max(qx, qy), 0) -
-        cornerRadius;
+      const cardDistance = roundedRectDistance(
+        Math.abs(pointX - cardWidth / 2) - (cardWidth / 2 - cornerRadius),
+        cardQY,
+        cornerRadius,
+      );
       const cardCoverage = clamp(0.5 - cardDistance * scale);
-      const glow =
-        cardCoverage < 1
-          ? GLOW_OPACITY *
-            0.5 *
-            erfc(Math.max(cardDistance, 0) / (GLOW_SIGMA * Math.SQRT2))
-          : 0;
-      let alpha = glow;
-      for (let channel = 0; channel < 3; channel++) {
-        color[channel] = accent[channel] * glow;
-      }
-
-      if (cardCoverage > 0) {
-        // The inner surface is the card inset by the border, so its distance
-        // is the card's plus the border width.
-        const surfaceCoverage =
-          SURFACE_OPACITY *
-          clamp(0.5 - (cardDistance + BORDER_WIDTH) * scale);
-        for (let channel = 0; channel < 3; channel++) {
-          const edge = border[x * 3 + channel];
-          const card = edge + (surface[channel] - edge) * surfaceCoverage;
-          color[channel] = card * cardCoverage + color[channel] * (1 - cardCoverage);
-        }
-
-        for (let dot = 0; inDotRows && dot < palette.length; dot++) {
-          if (Math.abs(pointX - dotX[dot]) >= dotReach) continue;
-          const dotDistance =
-            Math.hypot(pointX - dotX[dot], dotOffsetY) - dotRadius;
-          const dotCoverage = clamp(0.5 - dotDistance * scale) * cardCoverage;
-          if (dotCoverage === 0) continue;
-          // A 1pt outline stroked just inside the dot's edge.
-          const outlineCoverage =
-            OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
-          for (let channel = 0; channel < 3; channel++) {
-            const fill =
-              palette[dot][channel] +
-              (surface[channel] - palette[dot][channel]) * outlineCoverage;
-            color[channel] += (fill - color[channel]) * dotCoverage;
-          }
-        }
-        alpha = cardCoverage + alpha * (1 - cardCoverage);
-      }
-
       const offset = (y * width + x) * 4;
-      if (alpha > 0) {
+      if (cardCoverage === 0) continue;
+
+      // The gradient shows as the border around the 94% surface.
+      const surfaceCoverage =
+        SURFACE_OPACITY * clamp(0.5 - (cardDistance + borderWidth) * scale);
+      for (let channel = 0; channel < 3; channel++) {
+        const edge = cardColors[x * 3 + channel];
+        color[channel] = edge + (surface[channel] - edge) * surfaceCoverage;
+      }
+
+      if (inButtonRows && pointX > buttonLeft - 1 && pointX < buttonRight + 1) {
+        const buttonDistance = roundedRectDistance(
+          Math.abs(pointX - (buttonLeft + buttonRight) / 2) -
+            (buttonWidth / 2 - buttonRadius),
+          buttonQY,
+          buttonRadius,
+        );
+        const buttonCoverage = clamp(0.5 - buttonDistance * scale);
+        const buttonOutline =
+          BUTTON_OUTLINE_OPACITY *
+          clamp((buttonDistance + outlineWidth) * scale + 0.5);
         for (let channel = 0; channel < 3; channel++) {
-          pixels[offset + channel] = Math.round(clamp(color[channel] / alpha) * 255);
+          const shaded = buttonColors[x * 3 + channel] * (1 - BUTTON_SHADE);
+          const fill = shaded + (white[channel] - shaded) * buttonOutline;
+          color[channel] += (fill - color[channel]) * buttonCoverage;
         }
       }
-      pixels[offset + 3] = Math.round(alpha * 255);
+
+      // Later dots overlap earlier ones; each has a 1pt outline stroked just
+      // inside its edge.
+      for (let dot = 0; inDotRows && dot < palette.length; dot++) {
+        if (Math.abs(pointX - dotX[dot]) >= dotReach) continue;
+        const dotDistance = Math.hypot(pointX - dotX[dot], offsetY) - dotRadius;
+        const dotCoverage = clamp(0.5 - dotDistance * scale);
+        if (dotCoverage === 0) continue;
+        const outlineCoverage =
+          OUTLINE_OPACITY * clamp((dotDistance + outlineWidth) * scale + 0.5);
+        for (let channel = 0; channel < 3; channel++) {
+          const fill =
+            palette[dot][channel] +
+            (surface[channel] - palette[dot][channel]) * outlineCoverage;
+          color[channel] += (fill - color[channel]) * dotCoverage;
+        }
+      }
+
+      for (let channel = 0; channel < 3; channel++) {
+        pixels[offset + channel] = Math.round(clamp(color[channel]) * 255);
+      }
+      pixels[offset + 3] = Math.round(cardCoverage * 255);
     }
   }
   return { width, height, pixels };
@@ -224,7 +240,7 @@ export async function themePreviewResponse(
 
   const url = new URL(request.url);
   const token = url.pathname.match(
-    /^\/theme-preview\/v1\/([A-Za-z0-9_-]+)\.png$/,
+    /^\/theme-preview\/v2\/([A-Za-z0-9_-]+)\.png$/,
   )?.[1];
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;

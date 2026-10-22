@@ -9,12 +9,13 @@ import {
   rgbHex,
   themeName,
   themePreviewPath,
-  themePreviewSize,
-  type SharedTheme,
+  THEME_PREVIEW_SIZE,
 } from "../../../lib/theme-link";
 
 const SITE_URL = "https://sakuracord.app";
 const SAKURA_PINK = "#ef9bc4";
+const DESCRIPTION =
+  "Download SakuraCord to use this theme. SakuraCord is a native and fast Discord client for macOS.";
 
 type ThemeLinkPageProps = {
   params: Promise<{ token: string }>;
@@ -30,7 +31,6 @@ const loadThemeLink = cache((token: string) => {
     token,
     theme,
     name,
-    description: themeDescription(theme, decoded.kind !== "current"),
     // The card's first palette color, as SakuraCord renders it.
     accent: theme
       ? rgbHex(renderedRGB(theme, theme.colors[0], previewAppearance(theme)))
@@ -38,21 +38,10 @@ const loadThemeLink = cache((token: string) => {
   };
 });
 
-function themeDescription(theme: SharedTheme | null, needsUpdate: boolean) {
-  const opacity = Math.round((theme?.windowOpacity ?? 1) * 100);
-  const summary = theme
-    ? `A ${theme.appearance === "system" ? "" : `${theme.appearance} `}SakuraCord theme with ${theme.activeColorCount} ${theme.activeColorCount === 1 ? "color" : "colors"}${opacity < 100 ? ` and ${opacity}% window opacity` : ""}.`
-    : "A SakuraCord theme.";
-  return needsUpdate
-    ? `${summary} It needs a newer version of SakuraCord.`
-    : `${summary} Paste the link into any SakuraCord chat, then press Apply Theme.`;
-}
-
 function componentEmbed({
   token,
   theme,
   name,
-  description,
   accent,
 }: ReturnType<typeof loadThemeLink>) {
   return {
@@ -60,15 +49,16 @@ function componentEmbed({
       type: 17,
       accent_color: Number.parseInt(accent.slice(1), 16),
       components: [
-        { type: 10, content: `## ${name}\n${description}` },
+        { type: 10, content: `## ${name}\n${DESCRIPTION}` },
         ...(theme
           ? [
               {
                 type: 12,
                 items: [
                   {
+                    // No description: Discord would badge the image "ALT",
+                    // and the text above already names the theme.
                     media: { url: `${SITE_URL}${themePreviewPath(token)}` },
-                    description: `${name} palette`,
                   },
                 ],
               },
@@ -88,16 +78,15 @@ function componentEmbed({
 export async function generateMetadata({
   params,
 }: ThemeLinkPageProps): Promise<Metadata> {
-  const { token, theme, name, description } = loadThemeLink(
+  const { token, theme, name } = loadThemeLink(
     (await params).token,
   );
   const title = `${name} · SakuraCord`;
   const image = theme
     ? {
         url: themePreviewPath(token),
-        ...themePreviewSize(theme),
+        ...THEME_PREVIEW_SIZE,
         type: "image/png",
-        alt: `${name} palette`,
       }
     : {
         url: "/brand/sakuracord-app-icon.png",
@@ -109,20 +98,20 @@ export async function generateMetadata({
 
   return {
     title,
-    description,
+    description: DESCRIPTION,
     alternates: { canonical: `/settings/themes/${token}` },
     openGraph: {
       type: "website",
       url: `/settings/themes/${token}`,
       siteName: "SakuraCord",
       title,
-      description,
+      description: DESCRIPTION,
       images: [image],
     },
     twitter: {
       card: theme ? "summary_large_image" : "summary",
       title,
-      description,
+      description: DESCRIPTION,
       images: [image],
     },
   };
@@ -154,12 +143,12 @@ export default async function ThemeLinkPage({ params }: ThemeLinkPageProps) {
         className="community-page section-shell community-empty"
       >
         <h1>{themeLink.name}</h1>
-        <p>{themeLink.description}</p>
+        <p>{DESCRIPTION}</p>
         {themeLink.theme && (
           <img
             className="theme-link-preview"
             src={themePreviewPath(themeLink.token)}
-            {...themePreviewSize(themeLink.theme)}
+            {...THEME_PREVIEW_SIZE}
             alt={`${themeLink.name} palette`}
           />
         )}
