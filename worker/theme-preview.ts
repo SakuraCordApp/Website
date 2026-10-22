@@ -43,7 +43,10 @@ function columnGradient(
   const colors = new Float64Array(width * 3);
   for (let x = 0; x < width; x++) {
     const position =
-      clamp(((x + 0.5) / THEME_CARD.scale - left) / (right - left)) *
+      clamp(
+        ((x + 0.5) / THEME_CARD.scale - THEME_CARD.marginX - left) /
+          (right - left),
+      ) *
       (palette.length - 1);
     const index = Math.min(Math.floor(position), Math.max(palette.length - 2, 0));
     const next = Math.min(index + 1, palette.length - 1);
@@ -65,6 +68,8 @@ function renderThemePreview(theme: SharedTheme) {
     scale,
     width: cardWidth,
     height: cardHeight,
+    marginX,
+    marginY,
     inset,
     cornerRadius,
     borderWidth,
@@ -100,12 +105,12 @@ function renderThemePreview(theme: SharedTheme) {
   const pixels = new Uint8Array(width * height * 4);
   const color = new Float64Array(3);
   for (let y = 0; y < height; y++) {
-    const offsetY = (y + 0.5) / scale - centerY;
+    const offsetY = (y + 0.5) / scale - marginY - centerY;
     const cardQY = Math.abs(offsetY) - (cardHeight / 2 - cornerRadius);
     const inButtonRows = Math.abs(offsetY) < buttonRadius + edgeReach;
     const inDotRows = Math.abs(offsetY) < dotReach;
     for (let x = 0; x < width; x++) {
-      const pointX = (x + 0.5) / scale;
+      const pointX = (x + 0.5) / scale - marginX;
       const cardDistance = roundedRectDistance(
         Math.abs(pointX - centerX) - (centerX - cornerRadius),
         cardQY,
@@ -136,7 +141,7 @@ function renderThemePreview(theme: SharedTheme) {
         const buttonCoverage = clamp(0.5 - buttonDistance * scale);
         const buttonOutline =
           BUTTON_OUTLINE_OPACITY *
-          clamp((buttonDistance + outlineWidth) * scale + 0.5);
+          clamp((buttonDistance + borderWidth) * scale + 0.5);
         for (let channel = 0; channel < 3; channel++) {
           const shaded = buttonColors[x * 3 + channel] * (1 - BUTTON_SHADE);
           const fill = shaded + (1 - shaded) * buttonOutline;
@@ -248,7 +253,7 @@ export async function themePreviewResponse(
   const url = new URL(request.url);
   // URLs from earlier embeds still resolve, to the current design.
   const token = url.pathname.match(
-    /^\/theme-preview\/v[1-4]\/([A-Za-z0-9_-]+)\.png$/,
+    /^\/theme-preview\/v[1-5]\/([A-Za-z0-9_-]+)\.png$/,
   )?.[1];
   const decoded = token ? decodeThemeToken(token) : null;
   const theme = decoded?.kind === "current" ? decoded.theme : decoded?.preview;

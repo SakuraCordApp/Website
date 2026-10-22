@@ -132,29 +132,35 @@ export function decodeThemeToken(token: string): ThemeDecodeResult | null {
     : { kind: "current", theme };
 }
 
-// The in-chat theme link card, in points (SakuraCordDeepLinkSupport.swift,
-// NativeTimelineRowPainterMessage.swift), drawn at 3px per point.
+// A compact version of the in-chat theme link card (SakuraCordDeepLinkSupport
+// .swift, NativeTimelineRowPainterMessage.swift), in points at 4px per point.
+// Dots overlap by a third with an outline of 1/15 their size, like the app's.
+// Discord's media gallery fills a box whose ratio differs slightly from the
+// image's, cropping a few percent off either axis, so a transparent margin
+// keeps the card itself whole.
 export const THEME_CARD = {
-  scale: 3,
-  width: 560,
-  height: 74,
-  inset: 14,
-  cornerRadius: 18,
+  scale: 4,
+  width: 360,
+  height: 44,
+  marginX: 20,
+  marginY: 4,
+  inset: 10,
+  cornerRadius: 11,
   borderWidth: 1,
-  dotDiameter: 15,
-  dotStep: 10,
-  outlineWidth: 1,
-  buttonWidth: 196,
-  buttonHeight: 32,
+  dotDiameter: 24,
+  dotStep: 16,
+  outlineWidth: 1.6,
+  buttonWidth: 150,
+  buttonHeight: 28,
 };
 
 export const THEME_PREVIEW_SIZE = {
-  width: THEME_CARD.width * THEME_CARD.scale,
-  height: THEME_CARD.height * THEME_CARD.scale,
+  width: (THEME_CARD.width + THEME_CARD.marginX * 2) * THEME_CARD.scale,
+  height: (THEME_CARD.height + THEME_CARD.marginY * 2) * THEME_CARD.scale,
 };
 
 export function themePreviewPath(token: string) {
-  return `/theme-preview/v4/${token}.png`;
+  return `/theme-preview/v5/${token}.png`;
 }
 
 export function activeColors(theme: SharedTheme): ThemeColor[] {

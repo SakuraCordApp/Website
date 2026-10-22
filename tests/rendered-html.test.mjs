@@ -117,7 +117,7 @@ test("redirects every human settings request to the homepage", async () => {
 
 const THEME_TOKEN = "AQJKz_VpjwzNszNAALhRczO9cP__yjw";
 const THEME_PATH = `/settings/themes/${THEME_TOKEN}`;
-const THEME_IMAGE = `https://sakuracord.app/theme-preview/v4/${THEME_TOKEN}.png`;
+const THEME_IMAGE = `https://sakuracord.app/theme-preview/v5/${THEME_TOKEN}.png`;
 
 test("server-renders a palette embed for theme links", async () => {
   const response = await render(THEME_PATH, {
@@ -129,8 +129,8 @@ test("server-renders a palette embed for theme links", async () => {
 
   assert.match(html, /<title>Orange, Green &amp; Teal theme · SakuraCord<\/title>/);
   assert.equal(html.match(/property="og:image" content="([^"]+)"/)[1], THEME_IMAGE);
-  assert.match(html, /property="og:image:width" content="1680"/);
-  assert.match(html, /property="og:image:height" content="222"/);
+  assert.match(html, /property="og:image:width" content="1600"/);
+  assert.match(html, /property="og:image:height" content="208"/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(
     html,
@@ -171,7 +171,7 @@ test("theme links show a theme page to people and 404 when invalid", async () =>
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /<h1[^>]*>Orange, Green &amp; Teal theme<\/h1>/);
-  assert.match(html, new RegExp(`src="/theme-preview/v4/${THEME_TOKEN}\\.png"`));
+  assert.match(html, new RegExp(`src="/theme-preview/v5/${THEME_TOKEN}\\.png"`));
 
   // A corrupted checksum, which SakuraCord ignores too.
   const invalid = await render(`/settings/themes/${THEME_TOKEN.replace("Vp", "Ap")}`);
@@ -185,14 +185,14 @@ test("theme links show a theme page to people and 404 when invalid", async () =>
 });
 
 test("renders theme previews as cacheable PNGs in the theme's colors", async () => {
-  const response = await render(`/theme-preview/v4/${THEME_TOKEN}.png?v=2`);
+  const response = await render(`/theme-preview/v5/${THEME_TOKEN}.png?v=2`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "image/png");
   assert.match(response.headers.get("cache-control"), /immutable/);
 
   const png = Buffer.from(await response.arrayBuffer());
-  assert.equal(png.readUInt32BE(16), 1680);
-  assert.equal(png.readUInt32BE(20), 222);
+  assert.equal(png.readUInt32BE(16), 1600);
+  assert.equal(png.readUInt32BE(20), 208);
   const { inflateSync } = await import("node:zlib");
   const idat = [];
   for (let offset = 8; offset < png.length; ) {
@@ -203,7 +203,7 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
     offset += length + 12;
   }
   const scanlines = inflateSync(Buffer.concat(idat));
-  const stride = 1680 * 4 + 1;
+  const stride = 1600 * 4 + 1;
   const pixel = (x, y) => {
     const row = scanlines.subarray(y * stride + 1, (y + 1) * stride);
     const value = [0, 0, 0, 0];
@@ -217,22 +217,24 @@ test("renders theme previews as cacheable PNGs in the theme's colors", async () 
       .map((channel) => channel.toString(16).padStart(2, "0"))
       .join("")}/${value[3]}`;
   };
-  // Dot centres sit 10pt apart from (14pt + 7.5pt), on the bar's centre
-  // line, at 3px per point.
-  assert.equal(pixel(64, 111), "#8d543c/255");
-  assert.equal(pixel(94, 111), "#638d3a/255");
-  assert.equal(pixel(124, 111), "#378d73/255");
+  // Dot centres sit 16pt apart from the 20pt margin + 10pt inset + 12pt
+  // radius, on the bar's centre line, at 4px per point.
+  assert.equal(pixel(168, 104), "#8d543c/255");
+  assert.equal(pixel(232, 104), "#638d3a/255");
+  assert.equal(pixel(296, 104), "#378d73/255");
+  // The safe margin around the card is transparent.
   assert.equal(pixel(0, 0).split("/")[1], "0");
+  assert.equal(pixel(60, 104).split("/")[1], "0");
 
   // Earlier embeds' image URLs still resolve.
-  for (const version of ["v1", "v2", "v3"]) {
+  for (const version of ["v1", "v2", "v3", "v4"]) {
     assert.equal(
       (await render(`/theme-preview/${version}/${THEME_TOKEN}.png`)).status,
       200,
     );
   }
   assert.equal(
-    (await render(`/theme-preview/v4/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
+    (await render(`/theme-preview/v5/${THEME_TOKEN.replace("Vp", "Ap")}.png`))
       .status,
     404,
   );
