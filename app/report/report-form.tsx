@@ -5,15 +5,15 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type {
-  FiledReport,
-  IssueKind,
-  ReportField,
-  ReportFormDefinition,
-  SessionUser,
-  SimilarReport,
+import {
+  REPORT_FILES,
+  type FiledReport,
+  type IssueKind,
+  type ReportField,
+  type ReportFormDefinition,
+  type SessionUser,
+  type SimilarReport,
 } from "../lib/roadmap-types";
-import { REPORT_FILES } from "../lib/roadmap-types";
 
 const DRAFT_KEY = "sakuracord-report-draft";
 const normalizeVersion = (value: string) =>
@@ -157,9 +157,7 @@ export function ReportForm() {
       files.reduce((total, file) => total + file.size, 0) >
       REPORT_FILES.totalBytes
     )
-      return setError(
-        "Attachments can add up to 25 MB. Remove or shrink some and try again.",
-      );
+      return setError(REPORT_FILES.tooLarge);
     setBusy(true);
     setError("");
     try {

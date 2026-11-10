@@ -123,6 +123,8 @@ export const REPORT_FILES = {
   count: 5,
   fileBytes: 10 * 1024 * 1024,
   totalBytes: 25 * 1024 * 1024,
+  tooLarge:
+    "Attachments can add up to 25 MB. Remove or shrink some and try again.",
 };
 
 export interface SimilarReport {

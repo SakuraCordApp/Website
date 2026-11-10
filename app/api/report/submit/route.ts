@@ -47,13 +47,7 @@ export async function POST(request: Request) {
     return jsonResponse(await hub().submit({ kind, values, files, user }));
   } catch (error) {
     if (size > MAX_BODY_BYTES)
-      return jsonResponse(
-        {
-          error:
-            "Attachments can add up to 25 MB. Remove or shrink some and try again.",
-        },
-        413,
-      );
+      return jsonResponse({ error: REPORT_FILES.tooLarge }, 413);
     return errorResponse(error);
   }
 }
