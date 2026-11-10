@@ -279,7 +279,7 @@ export function ReportForm() {
         ) : (
           <span>
             You&apos;ll sign in with Discord when you submit, so we can ping you
-            with updates.
+            when it&apos;s completed.
           </span>
         )}
       </div>
