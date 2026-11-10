@@ -740,7 +740,7 @@ html {
   color: var(--muted);
 }
 .item-comment-form textarea,
-.report-field input,
+.report-field input:not([type="radio"]),
 .report-field textarea,
 .report-field select {
   width: 100%;

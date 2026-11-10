@@ -658,6 +658,7 @@ test("native report sign-in accepts only verified identities and rejects malform
     ROADMAP: {
       reportForm: async () => ({ applicationId: "1530180517155176458" }),
       meToo: async (input) => { calls.push(input); return { number: input.number }; },
+      submit: async (input) => { calls.push(input); return { number: 44 }; },
     },
     ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
   };
@@ -701,4 +702,24 @@ test("native report sign-in accepts only verified identities and rejects malform
   cookieRequest.headers.Cookie = `sc_session=${session.token}`;
   assert.equal((await invoke("/api/report/me-too", cookieRequest)).status, 200);
   assert.equal(calls[1].user.id, user.id);
+
+  // Screenshots and logs routinely exceed vinext's 1 MB server-action limit.
+  const report = (bytes) => {
+    const body = new FormData();
+    body.set("kind", "bug");
+    body.set("values", JSON.stringify({ title: "Fixture report" }));
+    body.append("files", new File([new Uint8Array(bytes)], "screenshot.png", { type: "image/png" }));
+    return invoke("/api/report/submit", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.token}` },
+      body,
+    });
+  };
+  const filed = await report(2 * 1024 * 1024);
+  assert.equal(filed.status, 200);
+  assert.equal(calls[2].files[0].data.byteLength, 2 * 1024 * 1024);
+  const tooLarge = await report(27 * 1024 * 1024);
+  assert.equal(tooLarge.status, 413);
+  assert.match((await tooLarge.json()).error, /25 MB/);
+  assert.equal(calls.length, 3);
 });

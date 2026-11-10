@@ -13,6 +13,7 @@ import type {
   SessionUser,
   SimilarReport,
 } from "../lib/roadmap-types";
+import { REPORT_FILES } from "../lib/roadmap-types";
 
 const DRAFT_KEY = "sakuracord-report-draft";
 const normalizeVersion = (value: string) =>
@@ -150,18 +151,30 @@ export function ReportForm() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!session?.user) return signIn();
+    const oversized = files.find((file) => file.size > REPORT_FILES.fileBytes);
+    if (oversized) return setError(`${oversized.name} is larger than 10 MB.`);
+    if (
+      files.reduce((total, file) => total + file.size, 0) >
+      REPORT_FILES.totalBytes
+    )
+      return setError(
+        "Attachments can add up to 25 MB. Remove or shrink some and try again.",
+      );
     setBusy(true);
     setError("");
     try {
       const body = new FormData();
       body.set("kind", kind);
       body.set("values", JSON.stringify(values));
-      for (const file of files.slice(0, 5)) body.append("files", file);
+      for (const file of files) body.append("files", file);
       const response = await fetch("/api/report/submit", {
         method: "POST",
         body,
       });
-      const data = (await response.json()) as FiledReport & { error?: string };
+      // Errors from Cloudflare itself are not JSON.
+      const data = (await response.json().catch(() => ({}))) as FiledReport & {
+        error?: string;
+      };
       if (!response.ok) throw new Error(data.error);
       setOutcome({ report: data, existing: false });
       window.scrollTo({ top: 0 });
@@ -426,12 +439,14 @@ function Field({
           accept="image/*,video/*,.txt,.log,.json"
           multiple
           onChange={(event) =>
-            onFiles([...(event.target.files ?? [])].slice(0, 5))
+            onFiles(
+              [...(event.target.files ?? [])].slice(0, REPORT_FILES.count),
+            )
           }
         />
         <small>
           {files.length ? `${files.length} selected · ` : ""}Up to 5 files, 10
-          MB each.
+          MB each and 25 MB in total.
         </small>
       </label>
     );

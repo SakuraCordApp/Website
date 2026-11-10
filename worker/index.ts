@@ -5,6 +5,7 @@ import {
   DEFAULT_IMAGE_SIZES,
 } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { POST as submitReport } from "../app/api/report/submit/route";
 import { isLinkPreviewBot } from "../app/lib/link-preview-bots";
 import { roadmapService } from "./roadmap-context";
 import { themePreviewResponse } from "./theme-preview";
@@ -221,7 +222,13 @@ const worker = {
         responses: new Map(),
         env,
       },
-      () => handler.fetch(request, env, ctx),
+      () =>
+        // vinext reads every multipart POST as a possible server action first
+        // and rejects bodies over 1 MB, so reports with screenshots or logs
+        // go straight to their route handler.
+        url.pathname === "/api/report/submit" && request.method === "POST"
+          ? submitReport(request)
+          : handler.fetch(request, env, ctx),
     );
     return settingsDeepLink ? varyByUserAgent(response) : response;
   },

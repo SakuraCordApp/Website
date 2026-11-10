@@ -115,6 +115,16 @@ export interface FiledReport {
   trackerUrl: string;
 }
 
+/**
+ * The hub's attachment limits. The total keeps one report within a Worker's
+ * memory and the service binding's RPC message size.
+ */
+export const REPORT_FILES = {
+  count: 5,
+  fileBytes: 10 * 1024 * 1024,
+  totalBytes: 25 * 1024 * 1024,
+};
+
 export interface SimilarReport {
   number: number;
   title: string;
