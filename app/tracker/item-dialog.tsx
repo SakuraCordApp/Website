@@ -88,7 +88,8 @@ async function loadDetail(number: number): Promise<IssueDetail> {
   return (await response.json()) as IssueDetail;
 }
 
-function useDetail(number: number) {
+/** Reloads when the board shows the report changed, e.g. a new reply or status. */
+function useDetail(number: number, updatedAt: string) {
   const { details } = useTracker();
   const [detail, setDetail] = useState<IssueDetail | null>(
     () => details.current.get(number) ?? null,
@@ -111,7 +112,7 @@ function useDetail(number: number) {
     return () => {
       cancelled = true;
     };
-  }, [number, version, details]);
+  }, [number, updatedAt, version, details]);
   return { detail, failed, reload: () => setVersion((value) => value + 1) };
 }
 
@@ -226,7 +227,7 @@ function TimelineItem({ entry, kind }: { entry: TimelineEntry; kind: string }) {
 
 export function ItemDialog({ issue }: { issue: TrackerIssue }) {
   const { meta, session } = useTracker();
-  const { detail, failed, reload } = useDetail(issue.number);
+  const { detail, failed, reload } = useDetail(issue.number, issue.updatedAt);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [comment, setComment] = useState("");
