@@ -197,8 +197,8 @@ export function ReportForm() {
         </h1>
         <p>
           {outcome.existing
-            ? "We added your details to the existing report. You'll be pinged in Discord when it changes."
-            : "Thank you! Your report has a Discord post and a GitHub issue. You'll be pinged in Discord when it's confirmed, fixed, and shipped."}
+            ? "We added your details to the existing report. You'll be pinged in Discord when it's completed."
+            : "Thank you! Your report has a Discord post and a GitHub issue. You'll be pinged in Discord when it's completed."}
         </p>
         <div className="report-links">
           {outcome.report.threadUrl ? (
@@ -279,7 +279,7 @@ export function ReportForm() {
         ) : (
           <span>
             You&apos;ll sign in with Discord when you submit, so we can ping you
-            with updates.
+            when it&apos;s completed.
           </span>
         )}
       </div>
